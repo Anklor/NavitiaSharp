@@ -109,10 +109,4 @@ namespace NavitiaSharp
         public StopArea StopArea { get; set; }
     }
 
-    public class StopPointCollection
-    {
-
-        [DeserializeAs(Name = "stop_points")]
-        public List<StopPoint> StopPoints { get; set; }
-    }
 }

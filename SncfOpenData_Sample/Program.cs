@@ -16,7 +16,9 @@ namespace SncfOpenData
             string sncfAuthKey = ConfigurationManager.AppSettings["SNCF_API_KEY"];
             SncfApi sncfApi = new SncfApi(sncfAuthKey);
             var sa = sncfApi.GetStopArea("stop_area:OCE:SA:87113001");
-            StopPointCollection sp = sncfApi.GetStopPoint("stop_point:OCE:SP:CorailIntercité-87113001");
+            List<StopPoint> sp = sncfApi.GetStopPoint("stop_point:OCE:SP:CorailIntercité-87113001");
         }
+
+
     }
 }
