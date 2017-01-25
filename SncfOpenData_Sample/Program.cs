@@ -2,6 +2,7 @@
 using NavitiaSharp;
 using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -12,7 +13,8 @@ namespace SncfOpenData
     {
         static void Main(string[] args)
         {
-            SncfApi sncfApi = new SncfApi("YOUR_API_KEY");
+            string sncfAuthKey = ConfigurationManager.AppSettings["SNCF_API_KEY"];
+            SncfApi sncfApi = new SncfApi(sncfAuthKey);
             var sa = sncfApi.GetStopArea("stop_area:OCE:SA:87113001");
             StopPointCollection sp = sncfApi.GetStopPoint("stop_point:OCE:SP:CorailIntercité-87113001");
         }
