@@ -53,12 +53,30 @@ namespace SncfOpenData
                 var exception = new ApplicationException(message, response.ErrorException);
                 throw exception;
             }
-            return response.Data;
+            switch (response.StatusCode)
+            {
+                case System.Net.HttpStatusCode.OK:
+                    return response.Data;
+                case System.Net.HttpStatusCode.Unauthorized:
+                    throw new Exception("Unauthorized. Check you have provided a valid API key.");
+                default:
+                    string message = $"Error retrieving response : {response.StatusDescription}";
+                    var exception = new ApplicationException(message);
+                    throw exception;
+            }
         }
 
         #endregion
 
-        public List<StopPoint> GetStopPoint(string stopPointId)
+        public List<StopPoint> GetStopPoints()
+        {
+            var request = new RestRequest();
+            request.Resource = "/stop_points";
+            request.RootElement = "stop_points";
+
+            return Execute<List<StopPoint>>(request);
+        }
+        public StopPoint GetStopPoint(string stopPointId)
         {
             var request = new RestRequest();
             request.Resource = "/stop_points/{stopPointId}";
@@ -66,7 +84,7 @@ namespace SncfOpenData
 
             request.AddParameter("stopPointId", stopPointId, ParameterType.UrlSegment);
 
-            return Execute<List<StopPoint>>(request);
+            return Execute<List<StopPoint>>(request).FirstOrDefault();
         }
         public StopArea GetStopArea(string stopAreaId)
         {
@@ -78,13 +96,39 @@ namespace SncfOpenData
 
             return Execute<List<StopArea>>(request).FirstOrDefault();
         }
-        public  List<StopArea> GetStopAreas(int numResults, int numPage)
+        public List<StopArea> GetStopAreas(int numResults = 25, int numPage = 0)
         {
             var request = new RestRequest();
-            request.Resource = "/stop_areas";
+            request.Resource = "/stop_areas/";
             request.RootElement = "stop_areas";
 
+
+            request.AddParameter("count", numResults, ParameterType.QueryString);
+            request.AddParameter("start_page", numPage, ParameterType.QueryString);
+
             return Execute<List<StopArea>>(request);
+        }
+        public PagedResult<StopArea> GetStopAreasPaged(int numResults = 25, int numPage = 0)
+        {
+            var request = new RestRequest();
+            request.Resource = "/stop_areas/";
+
+
+            request.AddParameter("count", numResults, ParameterType.QueryString);
+            request.AddParameter("start_page", numPage, ParameterType.QueryString);
+
+            return Execute<PagedResult<StopArea>>(request);
+        }
+        public PagedResult<T> GetPagedResult<T>(string resourcePath, int numResults = 25, int numPage = 0) where T : new()
+        {
+            var request = new RestRequest();
+            request.Resource = "/" + resourcePath  +"/";
+
+
+            request.AddParameter("count", numResults, ParameterType.QueryString);
+            request.AddParameter("start_page", numPage, ParameterType.QueryString);
+
+            return Execute<PagedResult<T>>(request);
         }
 
     }

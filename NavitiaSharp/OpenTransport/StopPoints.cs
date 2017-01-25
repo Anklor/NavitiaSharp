@@ -63,7 +63,7 @@ namespace NavitiaSharp
         public string Name { get; set; }
 
         [DeserializeAs(Name = "links")]
-        public List<object> Links { get; set; }
+        public List<Link> Links { get; set; }
 
         [DeserializeAs(Name = "coord")]
         public Coord Coord { get; set; }
@@ -88,7 +88,7 @@ namespace NavitiaSharp
         public string Name { get; set; }
 
         [DeserializeAs(Name = "links")]
-        public List<object> Links { get; set; }
+        public List<Link> Links { get; set; }
 
         [DeserializeAs(Name = "coord")]
         public Coord Coord { get; set; }
