@@ -45,6 +45,10 @@ namespace SncfOpenData
             client.BaseUrl = new Uri(_baseUrl);
             client.Authenticator = new HttpBasicAuthenticator(_apiKey, null);
 
+            request.OnBeforeDeserialization = r => {
+                int i = 0;
+                i++;
+            };
             var response = client.Execute<T>(request);
 
             if (response.ErrorException != null)
@@ -96,6 +100,16 @@ namespace SncfOpenData
 
             return Execute<List<StopArea>>(request).FirstOrDefault();
         }
+        public Line GetLine(string lineId)
+        {
+            var request = new RestRequest();
+            request.Resource = "/lines/{lineId}";
+            request.RootElement = "lines";
+
+            request.AddParameter("lineId", lineId, ParameterType.UrlSegment);
+
+            return Execute<List<Line>>(request).FirstOrDefault();
+        }
         public List<StopArea> GetStopAreas(int numResults = 25, int numPage = 0)
         {
             var request = new RestRequest();
@@ -122,13 +136,25 @@ namespace SncfOpenData
         public PagedResult<T> GetPagedResult<T>(string resourcePath, int numResults = 25, int numPage = 0) where T : new()
         {
             var request = new RestRequest();
-            request.Resource = "/" + resourcePath  +"/";
-
+            request.Resource = "/" + resourcePath + "/";
+            request.RequestFormat = DataFormat.Json;
 
             request.AddParameter("count", numResults, ParameterType.QueryString);
             request.AddParameter("start_page", numPage, ParameterType.QueryString);
 
             return Execute<PagedResult<T>>(request);
+        }
+        public List<T> GetListResult<T>(string resourcePath, string rootElement, int numResults = 25, int numPage = 0) where T : new()
+        {
+            var request = new RestRequest();
+            request.Resource = "/" + resourcePath + "/";
+            request.RootElement = rootElement;
+
+
+            request.AddParameter("count", numResults, ParameterType.QueryString);
+            request.AddParameter("start_page", numPage, ParameterType.QueryString);
+
+            return Execute<List<T>>(request);
         }
 
     }

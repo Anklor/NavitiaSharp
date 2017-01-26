@@ -33,8 +33,21 @@ namespace NavitiaSharp
         [DeserializeAs(Name = "stop_areas")]
         public List<T> Results { get; set; }
 
+        [DeserializeAs(Name = "disruptions")]
+        public List<object> Disruptions { get; set; }
+
         [DeserializeAs(Name = "links")]
         public List<Link> Links { get; set; }
+
+        public bool HasMoreData
+        {
+            get
+            {
+                int maxPage = (int)Math.Floor((float)Pagination.TotalResult / Pagination.ItemsPerPage);
+                bool hasData = (Pagination.StartPage) < maxPage;
+                return hasData;
+            }
+        }
     }
 
     public class Pagination
@@ -51,8 +64,6 @@ namespace NavitiaSharp
         [DeserializeAs(Name = "total_result")]
         public int TotalResult { get; set; }
     }
-
-
 
     public class Link
     {
