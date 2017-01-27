@@ -44,6 +44,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Deserializer\JsonDeserializer.cs" />
+    <Compile Include="Deserializer\PagedResultDataAttribute.cs" />
     <Compile Include="Model\AdministrativeRegion.cs" />
     <Compile Include="Model\Network.cs" />
     <Compile Include="Model\CommercialMode.cs" />
@@ -56,7 +58,7 @@
     <Compile Include="Model\Coord.cs" />
     <Compile Include="Model\Code.cs" />
     <Compile Include="Model\Line.cs" />
-    <Compile Include="PagedResult.cs" />
+    <Compile Include="PagedResults\PagedResult.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="NavitiaApi.cs" />
   </ItemGroup>

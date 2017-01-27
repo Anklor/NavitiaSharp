@@ -9,7 +9,6 @@ namespace NavitiaSharp
 {
     public class Line
     {
-
         [DeserializeAs(Name = "code")]
         public string Code { get; set; }
 
@@ -48,6 +47,11 @@ namespace NavitiaSharp
 
         [DeserializeAs(Name = "network")]
         public Network Network { get; set; }
+
+        public override string ToString()
+        {
+            return Name;
+        }
     }
 
 

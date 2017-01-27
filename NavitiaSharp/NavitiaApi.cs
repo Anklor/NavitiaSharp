@@ -1,10 +1,12 @@
 ﻿using NavitiaSharp;
 using RestSharp;
 using RestSharp.Authenticators;
+using RestSharp.Deserializers;
 using RestSharp.Serializers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -39,16 +41,13 @@ namespace SncfOpenData
             }
             return response.Data;
         }
-        public T Execute<T>(RestRequest request) where T : new()
+        public T Execute<T>(RestRequest request, string resourcePath = null) where T : new()
         {
             var client = new RestClient();
             client.BaseUrl = new Uri(_baseUrl);
             client.Authenticator = new HttpBasicAuthenticator(_apiKey, null);
-
-            request.OnBeforeDeserialization = r => {
-                int i = 0;
-                i++;
-            };
+            client.AddHandler("application/json", new NavitiaSharp.Deserializers.JsonDeserializer(resourcePath));
+            
             var response = client.Execute<T>(request);
 
             if (response.ErrorException != null)
@@ -110,39 +109,17 @@ namespace SncfOpenData
 
             return Execute<List<Line>>(request).FirstOrDefault();
         }
-        public List<StopArea> GetStopAreas(int numResults = 25, int numPage = 0)
-        {
-            var request = new RestRequest();
-            request.Resource = "/stop_areas/";
-            request.RootElement = "stop_areas";
+      
 
-
-            request.AddParameter("count", numResults, ParameterType.QueryString);
-            request.AddParameter("start_page", numPage, ParameterType.QueryString);
-
-            return Execute<List<StopArea>>(request);
-        }
-        public PagedResult<StopArea> GetStopAreasPaged(int numResults = 25, int numPage = 0)
-        {
-            var request = new RestRequest();
-            request.Resource = "/stop_areas/";
-
-
-            request.AddParameter("count", numResults, ParameterType.QueryString);
-            request.AddParameter("start_page", numPage, ParameterType.QueryString);
-
-            return Execute<PagedResult<StopArea>>(request);
-        }
         public PagedResult<T> GetPagedResult<T>(string resourcePath, int numResults = 25, int numPage = 0) where T : new()
         {
             var request = new RestRequest();
             request.Resource = "/" + resourcePath + "/";
-            request.RequestFormat = DataFormat.Json;
 
             request.AddParameter("count", numResults, ParameterType.QueryString);
             request.AddParameter("start_page", numPage, ParameterType.QueryString);
 
-            return Execute<PagedResult<T>>(request);
+            return Execute<PagedResult<T>>(request, resourcePath);
         }
         public List<T> GetListResult<T>(string resourcePath, string rootElement, int numResults = 25, int numPage = 0) where T : new()
         {
