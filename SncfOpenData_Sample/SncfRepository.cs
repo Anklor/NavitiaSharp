@@ -147,8 +147,54 @@ namespace SncfOpenData
             var spQuery = DataPack.StopPoints.Where(obj => obj.StopArea.Id == idToFind).ToList();
 
             var routeSchedulesQueryFromMemory = DataPack.LineRouteSchedules.SelectMany(rs => rs.Value).Where(rs => rs.Table.Rows.Any(r => r.StopPoint.StopArea.Id == idToFind)).ToList();
+            HashSet<string> journeys = new HashSet<string>();
+            routeSchedulesQueryFromMemory.ForEach(rs => journeys.UnionWith(ExtractVehiculeJourneysFromRouteSchedule(rs)));
+
             //var routeSchedulesQueryFromMemory = DataPack.Lines.SelectMany(line => DataPack.LineRouteSchedules[line.Id]).Where(rs => rs.Table.Rows.Any(r => r.StopPoint.StopArea.Id == idToFind)).ToList();
             //var routeSchedulesQueryFromDisk = DataPack.Lines.SelectMany(line => GetLineRouteSchedules(line, false)).Where(rs => rs.Table.Rows.Any(r => r.StopPoint.StopArea.Id == idToFind)).ToList();
+        }
+
+        private HashSet<string> ExtractVehiculeJourneysFromRouteSchedule(RouteSchedule routeSchedule)
+        {
+            //Table / Links / Type "vehicle_journey"
+
+            HashSet<string> journeys = new HashSet<string>();
+            foreach (var header in routeSchedule.Table.Headers)
+            {
+                foreach(var link in header.Links)
+                {
+                    if (link.Type=="vehicle_journey")
+                    {
+                        journeys.Add(link.Id);
+                    }
+                    if (link.Type.StartsWith( "trip"))
+                    {
+                        journeys.Add(link.Id);
+                    }
+                }
+            }
+            foreach (var row in routeSchedule.Table.Rows)
+            {
+                foreach (var dt in row.DateTimes)
+                {
+                    foreach (var link in dt.Links)
+                    {
+                       if (link.Type.StartsWith("trip"))
+                        {
+                            journeys.Add(link.Id);
+                        }
+                    }
+                }
+                foreach (var link in row.StopPoint.Links)
+                {
+                    if (link.Type.StartsWith("trip"))
+                    {
+                        journeys.Add(link.Id);
+                    }
+                }
+            }
+            return journeys;
+
         }
 
 
