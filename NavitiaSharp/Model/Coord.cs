@@ -11,5 +11,10 @@ namespace NavitiaSharp
 
         [DeserializeAs(Name = "lon")]
         public string Lon { get; set; }
+
+        public override string ToString()
+        {
+            return $"{Lat} {Lon}";
+        }
     }
 }

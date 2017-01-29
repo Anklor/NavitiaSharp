@@ -20,5 +20,10 @@ namespace NavitiaSharp
 
         [DeserializeAs(Name = "id")]
         public string Id { get; set; }
+
+        public override string ToString()
+        {
+            return $"{Name}";
+        }
     }
 }

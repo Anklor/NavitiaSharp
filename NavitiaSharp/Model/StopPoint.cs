@@ -29,5 +29,10 @@ namespace NavitiaSharp
 
         [DeserializeAs(Name = "stop_area")]
         public StopArea StopArea { get; set; }
+
+        public override string ToString()
+        {
+            return $"{Name}";
+        }
     }
 }

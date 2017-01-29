@@ -26,5 +26,10 @@ namespace NavitiaSharp
 
         [DeserializeAs(Name = "zip_code")]
         public string ZipCode { get; set; }
+
+        public override string ToString()
+        {
+            return $"{Name}";
+        }
     }
 }
