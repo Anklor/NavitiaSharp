@@ -13,6 +13,7 @@ namespace SncfOpenData
 {
     public class SncfRepository
     {
+        private const string LINE_ROUTE_SCHEDULES_DIR = "line.route_schedules";
         readonly string _dataDirectory;
         readonly SncfApi _api;
         public SncfApi Api
@@ -20,16 +21,16 @@ namespace SncfOpenData
             get { return _api; }
         }
 
-        private SncfDataPack _dataPack;
+        private SncfDataPack _dataPackInternal;
         public SncfDataPack DataPack
         {
             get
             {
-                if (_dataPack == null)
+                if (_dataPackInternal == null)
                 {
-                    _dataPack = LoadDataPack();
+                    _dataPackInternal = LoadDataPack();
                 }
-                return _dataPack;
+                return _dataPackInternal;
             }
         }
 
@@ -72,9 +73,28 @@ namespace SncfOpenData
             }
         }
 
+        public List<RouteSchedule> GetLineRouteSchedules(Line line, bool fromApi = false)        
+        {
+            List<RouteSchedule> allItems = null;
+            if (line != null)
+            {
+                if (fromApi)
+                {
+                    allItems = GetAllPagedResults<RouteSchedule>(_api, (n, p) => _api.GetLineRouteSchedules(line.Id, n, p), ChunckSize);
+                }
+                else
+                {
+                    // load from disk
+                    string fullFileName = Path.Combine(_dataDirectory, LINE_ROUTE_SCHEDULES_DIR, line.Id.Replace(":", ".") + ".json");
+                    allItems = LoadSavedData<RouteSchedule>(fullFileName);
+                }
+            }
+            return allItems;
+        }
+
         private void SaveLineRouteSchedules(SncfApi sncfApi, List<Line> lines, string dataDir, int chunkSize = DEFAULT_CHUNK_SIZE)
         {
-            string schedulesDir = Path.Combine(dataDir, "line.route_schedules");
+            string schedulesDir = Path.Combine(dataDir, LINE_ROUTE_SCHEDULES_DIR);
             CheckDirExists(schedulesDir);
 
             foreach (var line in lines)
@@ -96,17 +116,17 @@ namespace SncfOpenData
 
         public void TestQueryWithStopName(string str2Find)
         {
-            var saQuery = _dataPack.StopAreas.Where(obj => obj.Name.ToUpper().Contains(str2Find)).ToList();
-            var spQuery = _dataPack.StopPoints.Where(obj => obj.Name.ToUpper().Contains(str2Find)).ToList();
-            var linesQuery = _dataPack.Lines.Where(obj => obj.Routes != null && obj.Routes.Any(r => r.Direction.Name.ToUpper().Contains(str2Find))).ToList();
-            var routesQuery = _dataPack.Routes.Where(obj => obj.Direction.Name.ToUpper().Contains(str2Find)).ToList();
+            var saQuery = DataPack.StopAreas.Where(obj => obj.Name.ToUpper().Contains(str2Find)).ToList();
+            var spQuery = DataPack.StopPoints.Where(obj => obj.Name.ToUpper().Contains(str2Find)).ToList();
+            var linesQuery = DataPack.Lines.Where(obj => obj.Routes != null && obj.Routes.Any(r => r.Direction.Name.ToUpper().Contains(str2Find))).ToList();
+            var routesQuery = DataPack.Routes.Where(obj => obj.Direction.Name.ToUpper().Contains(str2Find)).ToList();
         }
         public void TestQueryWithId(string idToFind)
         {
-            var saQuery = _dataPack.StopAreas.Where(obj => obj.Id == idToFind).ToList();
-            var linesQuery = _dataPack.Lines.Where(obj => obj.Id == idToFind).ToList();
-            var routesQuery = _dataPack.Routes.Where(obj => obj.Id == idToFind).ToList();
-            var spQuery = _dataPack.StopPoints.Where(obj => obj.Id == idToFind).ToList();
+            var saQuery = DataPack.StopAreas.Where(obj => obj.Id == idToFind).ToList();
+            var linesQuery = DataPack.Lines.Where(obj => obj.Id == idToFind).ToList();
+            var routesQuery = DataPack.Routes.Where(obj => obj.Id == idToFind).ToList();
+            var spQuery = DataPack.StopPoints.Where(obj => obj.Id == idToFind).ToList();
         }
 
 
