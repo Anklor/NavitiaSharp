@@ -13,5 +13,6 @@ namespace SncfOpenData
         public List<Route> Routes { get; set; }
         public List<StopArea> StopAreas { get; set; }
         public List<StopPoint> StopPoints { get; set; }
+        public Dictionary<string, List<RouteSchedule>> LineRouteSchedules { get; set; }
     }
 }

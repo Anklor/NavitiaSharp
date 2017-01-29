@@ -9,7 +9,6 @@ namespace NavitiaSharp
 {
     public class RouteSchedule
     {
-
         [DeserializeAs(Name = "display_informations")]
         public DisplayInformations DisplayInformations { get; set; }
 
@@ -24,6 +23,11 @@ namespace NavitiaSharp
 
         [DeserializeAs(Name = "geojson")]
         public Geojson Geojson { get; set; }
+
+        public override string ToString()
+        {
+            return $"{DisplayInformations}";
+        }
     }
 
 }

@@ -1,5 +1,7 @@
 ﻿using RestSharp.Deserializers;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace NavitiaSharp
 {
@@ -23,6 +25,16 @@ namespace NavitiaSharp
 
         [DeserializeAs(Name = "date_times")]
         public List<DateTimeItem> DateTimes { get; set; }
+
+        public override string ToString()
+        {
+            string ret = $"{StopPoint}";
+            if (DateTimes != null && DateTimes.Any())
+            {
+                ret = string.Concat(ret, " : ", string.Join<DateTimeItem>(", ", DateTimes));
+            }
+            return ret;
+        }
     }
 
     public class Table
@@ -33,6 +45,17 @@ namespace NavitiaSharp
 
         [DeserializeAs(Name = "rows")]
         public List<Row> Rows { get; set; }
+
+        public override string ToString()
+        {
+            string ret =  $"{Rows.Count} row(s)";
+            bool withSchedule = Rows.Any(r => r.DateTimes.Any(dt => dt.DateTime != default(DateTime)));
+            if (withSchedule)
+            { 
+                ret += " with schedules.";
+            }
+            return ret;
+        }
     }
 
 

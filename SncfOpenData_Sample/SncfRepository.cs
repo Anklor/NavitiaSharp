@@ -54,15 +54,25 @@ namespace SncfOpenData
             pack.Routes = LoadSavedData<Route>("routes.json");
             pack.StopAreas = LoadSavedData<StopArea>("stop_areas.json");
             pack.StopPoints = LoadSavedData<StopPoint>("stop_points.json");
+            pack.LineRouteSchedules = pack.Lines.Select(line => new { lineId = line.Id, schedules = GetLineRouteSchedules(line, false) })
+                                                  .ToDictionary(a => a.lineId, a => a.schedules);
 
             return pack;
         }
 
         private List<T> LoadSavedData<T>(string fileName)
         {
-            var json = File.ReadAllText(Path.Combine(_dataDirectory, fileName));
-            List<T> result = JsonConvert.DeserializeObject<List<T>>(json);
-            return result;
+            string fullFileName = Path.Combine(_dataDirectory, fileName);
+            if (File.Exists(fullFileName))
+            {
+                var json = File.ReadAllText(fullFileName);
+                List<T> result = JsonConvert.DeserializeObject<List<T>>(json);
+                return result;
+            }
+            else
+            {
+                return new List<T>();
+            }
         }
 
         private void CheckDirExists(string dirPath)
@@ -73,7 +83,7 @@ namespace SncfOpenData
             }
         }
 
-        public List<RouteSchedule> GetLineRouteSchedules(Line line, bool fromApi = false)        
+        public List<RouteSchedule> GetLineRouteSchedules(Line line, bool fromApi = false)
         {
             List<RouteSchedule> allItems = null;
             if (line != null)
@@ -85,7 +95,7 @@ namespace SncfOpenData
                 else
                 {
                     // load from disk
-                    string fullFileName = Path.Combine(_dataDirectory, LINE_ROUTE_SCHEDULES_DIR, line.Id.Replace(":", ".") + ".json");
+                    string fullFileName = Path.Combine(LINE_ROUTE_SCHEDULES_DIR, line.Id.Replace(":", ".") + ".json");
                     allItems = LoadSavedData<RouteSchedule>(fullFileName);
                 }
             }
@@ -127,6 +137,18 @@ namespace SncfOpenData
             var linesQuery = DataPack.Lines.Where(obj => obj.Id == idToFind).ToList();
             var routesQuery = DataPack.Routes.Where(obj => obj.Id == idToFind).ToList();
             var spQuery = DataPack.StopPoints.Where(obj => obj.Id == idToFind).ToList();
+        }
+
+        public void TestQueryWithStopAreaId(string idToFind)
+        {
+            var saQuery = DataPack.StopAreas.Where(obj => obj.Id == idToFind).ToList();
+            var linesQuery = DataPack.Lines.Where(obj => obj.Routes != null && obj.Routes.Any(r => r.Direction.StopArea.Id == idToFind)).ToList();
+            var routesQuery = DataPack.Routes.Where(obj => obj.Direction.StopArea.Id == idToFind).ToList();
+            var spQuery = DataPack.StopPoints.Where(obj => obj.StopArea.Id == idToFind).ToList();
+
+            var routeSchedulesQueryFromMemory = DataPack.LineRouteSchedules.SelectMany(rs => rs.Value).Where(rs => rs.Table.Rows.Any(r => r.StopPoint.StopArea.Id == idToFind)).ToList();
+            //var routeSchedulesQueryFromMemory = DataPack.Lines.SelectMany(line => DataPack.LineRouteSchedules[line.Id]).Where(rs => rs.Table.Rows.Any(r => r.StopPoint.StopArea.Id == idToFind)).ToList();
+            //var routeSchedulesQueryFromDisk = DataPack.Lines.SelectMany(line => GetLineRouteSchedules(line, false)).Where(rs => rs.Table.Rows.Any(r => r.StopPoint.StopArea.Id == idToFind)).ToList();
         }
 
 

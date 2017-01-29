@@ -22,7 +22,7 @@ namespace NavitiaSharp
 
         public override string ToString()
         {
-            return DateTime.ToString();
+            return DateTime == default(DateTime) ? "no stop" : DateTime.ToShortTimeString();
         }
     }
 
