@@ -89,8 +89,8 @@ namespace NavitiaSharp.Deserializers
                         name = _pagedDataRootName;
                     }
                     else
-                    { 
-                    name = prop.Name;
+                    {
+                        name = prop.Name;
                     }
                 }
 
@@ -283,6 +283,11 @@ namespace NavitiaSharp.Deserializers
             if (type == typeof(DateTime) || type == typeof(DateTimeOffset))
             {
                 DateTime dt;
+
+                if (string.IsNullOrWhiteSpace(stringValue))
+                {
+                    return default(DateTime);
+                }
 
                 if (this.DateFormat.HasValue())
                 {

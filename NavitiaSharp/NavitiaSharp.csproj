@@ -47,12 +47,14 @@
     <Compile Include="Deserializer\JsonDeserializer.cs" />
     <Compile Include="Deserializer\PagedResultDataAttribute.cs" />
     <Compile Include="Model\AdministrativeRegion.cs" />
+    <Compile Include="Model\Journey.cs" />
     <Compile Include="Model\Network.cs" />
     <Compile Include="Model\CommercialMode.cs" />
     <Compile Include="Model\Route.cs" />
     <Compile Include="Model\Direction.cs" />
     <Compile Include="Model\Geojson.cs" />
     <Compile Include="Model\PhysicalMode.cs" />
+    <Compile Include="Model\RouteSchedules.cs" />
     <Compile Include="Model\StopPoint.cs" />
     <Compile Include="Model\StopArea.cs" />
     <Compile Include="Model\Coord.cs" />

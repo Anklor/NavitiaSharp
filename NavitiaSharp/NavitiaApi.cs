@@ -47,6 +47,9 @@ namespace SncfOpenData
             client.BaseUrl = new Uri(_baseUrl);
             client.Authenticator = new HttpBasicAuthenticator(_apiKey, null);
             client.AddHandler("application/json", new NavitiaSharp.Deserializers.JsonDeserializer(resourcePath));
+
+            request.RequestFormat = DataFormat.Json;
+            request.DateFormat = "yyyyMMddTHHmmss";
             
             var response = client.Execute<T>(request);
 
@@ -61,7 +64,9 @@ namespace SncfOpenData
                 case System.Net.HttpStatusCode.OK:
                     return response.Data;
                 case System.Net.HttpStatusCode.Unauthorized:
-                    throw new Exception("Unauthorized. Check you have provided a valid API key.");
+                    throw new  UnauthorizedAccessException("Unauthorized. Check you have provided a valid API key.");
+                case System.Net.HttpStatusCode.NotFound:
+                    throw new KeyNotFoundException("NotFound.");
                 default:
                     string message = $"Error retrieving response : {response.StatusDescription}";
                     var exception = new ApplicationException(message);
@@ -109,13 +114,26 @@ namespace SncfOpenData
 
             return Execute<List<Line>>(request).FirstOrDefault();
         }
-      
+        public PagedResult<RouteSchedule> GetLineRouteSchedules(string lineId, int numResults = 25, int numPage = 0)
+        {
+            var request = new RestRequest();
+            request.Resource = $"/lines/{lineId}/route_schedules";
+
+            return GetPagedResult<RouteSchedule>(request, "route_schedules", numResults, numPage);      
+        }
 
         public PagedResult<T> GetPagedResult<T>(string resourcePath, int numResults = 25, int numPage = 0) where T : new()
         {
             var request = new RestRequest();
             request.Resource = "/" + resourcePath + "/";
 
+            request.AddParameter("count", numResults, ParameterType.QueryString);
+            request.AddParameter("start_page", numPage, ParameterType.QueryString);
+
+            return Execute<PagedResult<T>>(request, resourcePath);
+        }
+        public PagedResult<T> GetPagedResult<T>(RestRequest request, string resourcePath, int numResults = 25, int numPage = 0) where T : new()
+        {
             request.AddParameter("count", numResults, ParameterType.QueryString);
             request.AddParameter("start_page", numPage, ParameterType.QueryString);
 

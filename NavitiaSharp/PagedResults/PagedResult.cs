@@ -19,7 +19,7 @@ namespace NavitiaSharp
         public List<T> Results { get; set; }
 
         [DeserializeAs(Name = "disruptions")]
-        public List<object> Disruptions { get; set; }
+        public List<Disruption> Disruptions { get; set; }
 
         [DeserializeAs(Name = "links")]
         public List<Link> Links { get; set; }
@@ -61,8 +61,15 @@ namespace NavitiaSharp
         [DeserializeAs(Name = "rel")]
         public string Rel { get; set; }
 
+        [DeserializeAs(Name = "id")]
+        public string Id { get; set; }
+
         [DeserializeAs(Name = "templated")]
         public bool Templated { get; set; }
+
+        [DeserializeAs(Name = "value")]
+        public string Value { get; set; }
+
     }
 
 
