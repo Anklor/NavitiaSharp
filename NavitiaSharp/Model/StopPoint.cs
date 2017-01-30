@@ -1,9 +1,10 @@
 ﻿using RestSharp.Deserializers;
+using System;
 using System.Collections.Generic;
 
 namespace NavitiaSharp
 {
-    public class StopPoint
+    public class StopPoint : IEquatable<StopPoint>
     {
 
         [DeserializeAs(Name = "name")]
@@ -33,6 +34,25 @@ namespace NavitiaSharp
         public override string ToString()
         {
             return $"{Name}";
+        }
+
+        public bool Equals(StopPoint other)
+        {
+            return this.Id == other.Id;
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (obj is StopPoint)
+            {
+                return Equals((StopPoint)obj);
+            }
+            return false;
+        }
+
+        public override int GetHashCode()
+        {
+            return Id.GetHashCode();
         }
     }
 }

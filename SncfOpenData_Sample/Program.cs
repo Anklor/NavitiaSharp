@@ -40,9 +40,20 @@ namespace SncfOpenData
             //repo.SaveStaticData();
             // Line line = sncfApi.GetLine("line:OCE:SN-87276055-87276139");
 
+
+            // TODO : get all route stop areas
+            // we can then map to geo network with a little Dijkstra for each route
+            // goal : for each network line, get all connected routes and lines 
+
             string idStopArea_Meyrargues = "stop_area:OCE:SA:87751370";
             string idStopArea_MarseilleStCharles = "stop_area:OCE:SA:87751008";
             string idStopArea_AixTgv = "stop_area:OCE:SA:87319012";
+
+            var stopPoints = repo.GetAllStopPointsForLinesStoppingAtStopArea(idStopArea_Meyrargues);
+            stopPoints = repo.GetAllStopPointsForLinesStoppingAtStopArea(idStopArea_MarseilleStCharles);
+            stopPoints = repo.GetAllStopPointsForLinesStoppingAtStopArea(idStopArea_AixTgv);
+
+
             repo.TestQueryWithStopAreaId(idStopArea_Meyrargues);
             repo.TestQueryWithStopAreaId(idStopArea_AixTgv);
 
@@ -53,7 +64,7 @@ namespace SncfOpenData
             str2Find = "MARSEILLE";
             repo.TestQueryWithStopName(str2Find);
 
-           
+
 
 
         }
@@ -64,7 +75,7 @@ namespace SncfOpenData
             SqlGeography polyQuery = wkt == null ? null : SqlGeography.STGeomFromText(new SqlChars(new SqlString(wkt)), 4326);
 
             List<SqlGeography> geogList500 = new List<SqlGeography>();
-            
+
             using (SqlConnection con = new SqlConnection(connectionString))
             {
                 con.Open();

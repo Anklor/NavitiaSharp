@@ -58,7 +58,7 @@ namespace SncfOpenData
             //                                      .ToDictionary(a => a.lineId, a => a.schedules);
             pack.LineRouteSchedules = LoadSavedData<Dictionary<string, List<RouteSchedule>>>("linesroutesschedules.json");
 
-        
+
             return pack;
         }
 
@@ -163,10 +163,59 @@ namespace SncfOpenData
             var spQuery = DataPack.StopPoints.Where(obj => obj.StopArea.Id == idToFind).ToList();
 
             var routeSchedulesQueryFromMemory = DataPack.LineRouteSchedules.SelectMany(rs => rs.Value).Where(rs => rs.Table.Rows.Any(r => r.StopPoint.StopArea.Id == idToFind)).ToList();
+
+            List<Table> tables = new List<Table>();
+            List<List<StopPoint>> listStopPoints = new List<List<StopPoint>>();
+            HashSet<StopPoint> stopPoints = new HashSet<StopPoint>();
+            foreach (RouteSchedule routeSchedule in routeSchedulesQueryFromMemory)
+            {
+                // Get all stop points. Line is stopping at stop area
+                var stopPointsQuery = routeSchedule.Table.Rows.Select(r => r.StopPoint);
+
+                stopPoints.UnionWith(stopPointsQuery);
+                listStopPoints.Add(new List<StopPoint>(stopPointsQuery));
+                tables.Add(routeSchedule.Table);
+            }
             HashSet<string> journeys = new HashSet<string>();
             routeSchedulesQueryFromMemory.ForEach(rs => journeys.UnionWith(ExtractVehiculeJourneysFromRouteSchedule(rs)));
         }
-        
+
+        public Dictionary<string, HashSet<StopPoint>> GetAllStopPointsForLinesStoppingAtStopArea(string idToFind)
+        {
+            var saQuery = DataPack.StopAreas.Where(obj => obj.Id == idToFind).ToList();
+            Debug.Assert(saQuery.Any(), "No stop area with this Id !");
+
+            //var routeSchedulesQueryFromMemory = DataPack.LineRouteSchedules.SelectMany(rs => rs.Value).Where(rs => rs.Table.Rows.Any(r => r.StopPoint.StopArea.Id == idToFind)).ToList();
+
+            Dictionary<string, HashSet<StopPoint>> v_ret = new Dictionary<string, HashSet<StopPoint>>();
+            List<Table> tables = new List<Table>();
+            List<List<StopPoint>> listStopPoints = new List<List<StopPoint>>();
+            HashSet<StopPoint> stopPoints = new HashSet<StopPoint>();
+            foreach (KeyValuePair<string, List<RouteSchedule>> routeSchedulesByLineId in DataPack.LineRouteSchedules)
+            {
+                foreach (RouteSchedule routeSchedule in routeSchedulesByLineId.Value)
+                {
+                    if (routeSchedule.Table.Rows.Any(r => r.StopPoint.StopArea.Id == idToFind))
+                    {
+                        // Get all stop points. Line is stopping at stop area
+                        var stopPointsQuery = routeSchedule.Table.Rows.Select(r => r.StopPoint);
+
+                        stopPoints.UnionWith(stopPointsQuery);
+                        listStopPoints.Add(new List<StopPoint>(stopPointsQuery));
+                        tables.Add(routeSchedule.Table);
+
+                        if (!v_ret.ContainsKey(routeSchedulesByLineId.Key))
+                        {
+                            v_ret.Add(routeSchedulesByLineId.Key, new HashSet<StopPoint>());
+                        }
+                        v_ret[routeSchedulesByLineId.Key].UnionWith(stopPoints);
+                    }
+                }
+            }
+
+            return v_ret;
+        }
+
 
         private HashSet<string> ExtractVehiculeJourneysFromRouteSchedule(RouteSchedule routeSchedule)
         {
@@ -175,13 +224,13 @@ namespace SncfOpenData
             HashSet<string> journeys = new HashSet<string>();
             foreach (var header in routeSchedule.Table.Headers)
             {
-                foreach(var link in header.Links)
+                foreach (var link in header.Links)
                 {
-                    if (link.Type=="vehicle_journey")
+                    if (link.Type == "vehicle_journey")
                     {
                         journeys.Add(link.Id);
                     }
-                    if (link.Type.StartsWith( "trip"))
+                    if (link.Type.StartsWith("trip"))
                     {
                         journeys.Add(link.Id);
                     }
@@ -193,7 +242,7 @@ namespace SncfOpenData
                 {
                     foreach (var link in dt.Links)
                     {
-                       if (link.Type.StartsWith("trip"))
+                        if (link.Type.StartsWith("trip"))
                         {
                             journeys.Add(link.Id);
                         }

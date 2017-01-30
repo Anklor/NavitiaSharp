@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace NavitiaSharp
 {
-    public class Line
+    public class Line : IEquatable<Line>
     {
         [DeserializeAs(Name = "code")]
         public string Code { get; set; }
@@ -51,6 +51,24 @@ namespace NavitiaSharp
         public override string ToString()
         {
             return Name;
+        }
+        public bool Equals(Line other)
+        {
+            return this.Id == other.Id;
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (obj is Line)
+            {
+                return Equals((Line)obj);
+            }
+            return false;
+        }
+
+        public override int GetHashCode()
+        {
+            return Id.GetHashCode();
         }
     }
 
