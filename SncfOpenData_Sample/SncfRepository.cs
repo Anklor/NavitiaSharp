@@ -50,17 +50,19 @@ namespace SncfOpenData
         public SncfDataPack LoadDataPack()
         {
             SncfDataPack pack = new SncfDataPack();
-            pack.Lines = LoadSavedData<Line>("lines.json");
-            pack.Routes = LoadSavedData<Route>("routes.json");
-            pack.StopAreas = LoadSavedData<StopArea>("stop_areas.json");
-            pack.StopPoints = LoadSavedData<StopPoint>("stop_points.json");
-            pack.LineRouteSchedules = pack.Lines.Select(line => new { lineId = line.Id, schedules = GetLineRouteSchedules(line, false) })
-                                                  .ToDictionary(a => a.lineId, a => a.schedules);
+            pack.Lines = LoadSavedDataList<Line>("lines.json");
+            pack.Routes = LoadSavedDataList<Route>("routes.json");
+            pack.StopAreas = LoadSavedDataList<StopArea>("stop_areas.json");
+            pack.StopPoints = LoadSavedDataList<StopPoint>("stop_points.json");
+            //pack.LineRouteSchedules = pack.Lines.Select(line => new { lineId = line.Id, schedules = GetLineRouteSchedules(line, false) })
+            //                                      .ToDictionary(a => a.lineId, a => a.schedules);
+            pack.LineRouteSchedules = LoadSavedData<Dictionary<string, List<RouteSchedule>>>("linesroutesschedules.json");
 
+        
             return pack;
         }
 
-        private List<T> LoadSavedData<T>(string fileName)
+        private List<T> LoadSavedDataList<T>(string fileName)
         {
             string fullFileName = Path.Combine(_dataDirectory, fileName);
             if (File.Exists(fullFileName))
@@ -72,6 +74,20 @@ namespace SncfOpenData
             else
             {
                 return new List<T>();
+            }
+        }
+        private T LoadSavedData<T>(string fileName)
+        {
+            string fullFileName = Path.Combine(_dataDirectory, fileName);
+            if (File.Exists(fullFileName))
+            {
+                var json = File.ReadAllText(fullFileName);
+                T result = JsonConvert.DeserializeObject<T>(json);
+                return result;
+            }
+            else
+            {
+                return default(T);
             }
         }
 
@@ -96,7 +112,7 @@ namespace SncfOpenData
                 {
                     // load from disk
                     string fullFileName = Path.Combine(LINE_ROUTE_SCHEDULES_DIR, line.Id.Replace(":", ".") + ".json");
-                    allItems = LoadSavedData<RouteSchedule>(fullFileName);
+                    allItems = LoadSavedDataList<RouteSchedule>(fullFileName);
                 }
             }
             return allItems;
@@ -149,10 +165,8 @@ namespace SncfOpenData
             var routeSchedulesQueryFromMemory = DataPack.LineRouteSchedules.SelectMany(rs => rs.Value).Where(rs => rs.Table.Rows.Any(r => r.StopPoint.StopArea.Id == idToFind)).ToList();
             HashSet<string> journeys = new HashSet<string>();
             routeSchedulesQueryFromMemory.ForEach(rs => journeys.UnionWith(ExtractVehiculeJourneysFromRouteSchedule(rs)));
-
-            //var routeSchedulesQueryFromMemory = DataPack.Lines.SelectMany(line => DataPack.LineRouteSchedules[line.Id]).Where(rs => rs.Table.Rows.Any(r => r.StopPoint.StopArea.Id == idToFind)).ToList();
-            //var routeSchedulesQueryFromDisk = DataPack.Lines.SelectMany(line => GetLineRouteSchedules(line, false)).Where(rs => rs.Table.Rows.Any(r => r.StopPoint.StopArea.Id == idToFind)).ToList();
         }
+        
 
         private HashSet<string> ExtractVehiculeJourneysFromRouteSchedule(RouteSchedule routeSchedule)
         {
