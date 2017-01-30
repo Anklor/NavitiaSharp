@@ -22,16 +22,18 @@ namespace SncfOpenData
 
     class Program
     {
-        const string DATA_DIR = @"..\..\..\Data\SNCF";
+        const string DATA_DIR_SNCF = @"..\..\..\Data\SNCF";
+        const string DATA_DIR_IGN = @"..\..\..\Data\IGN";
 
         [STAThread()]
         static void Main(string[] args)
         {
+            AppDomain.CurrentDomain.SetData("DataDirectory", Path.GetFullPath(DATA_DIR_IGN));
             SqlServerTypes.Utilities.LoadNativeAssemblies(AppDomain.CurrentDomain.BaseDirectory);
 
-            SncfRepository repo = new SncfRepository(DATA_DIR, 1000);
+            SncfRepository repo = new SncfRepository(DATA_DIR_SNCF, 1000);
 
-            //ShowStopAreasOnMap(repo, "POLYGON((5.2734375 43.259580971072275,5.41351318359375 43.1614915129406,5.4986572265625 43.295574211963746,5.5810546875 43.42936191764414,5.90789794921875 43.57678451504994,5.877685546875 43.74766111392921,5.88043212890625 43.86064850339098,5.62225341796875 43.75559702541283,5.4327392578125 43.670230832122314,5.27069091796875 43.58474304793296,5.23773193359375 43.431356514362626,5.2734375 43.259580971072275))");
+            ShowStopAreasOnMap(repo, "POLYGON((5.2734375 43.259580971072275,5.41351318359375 43.1614915129406,5.4986572265625 43.295574211963746,5.5810546875 43.42936191764414,5.90789794921875 43.57678451504994,5.877685546875 43.74766111392921,5.88043212890625 43.86064850339098,5.62225341796875 43.75559702541283,5.4327392578125 43.670230832122314,5.27069091796875 43.58474304793296,5.23773193359375 43.431356514362626,5.2734375 43.259580971072275))");
 
             // Saves data identified as "static", ie: does not change often and can save remote Hits
             // Warning : this does not respect API rules. Use at your own risk
@@ -58,13 +60,15 @@ namespace SncfOpenData
 
         private static void ShowStopAreasOnMap(SncfRepository repo, string wkt = null)
         {
+            string connectionString = ConfigurationManager.ConnectionStrings["IGNData"].ConnectionString;
             SqlGeography polyQuery = wkt == null ? null : SqlGeography.STGeomFromText(new SqlChars(new SqlString(wkt)), 4326);
 
             List<SqlGeography> geogList500 = new List<SqlGeography>();
-            using (SqlConnection con = new SqlConnection("Data Source=ASUS;Initial Catalog=Sncf;Integrated Security=True"))
+            
+            using (SqlConnection con = new SqlConnection(connectionString))
             {
                 con.Open();
-                using (SqlCommand com = new SqlCommand("SELECT [ID],[NATURE],[ENERGIE],[geom4326].STAsBinary() FROM TRONCON_VOIE_FERREE_500_4326", con))
+                using (SqlCommand com = new SqlCommand("SELECT [ID],[NATURE],[ENERGIE],[geom4326].STAsBinary() FROM TRONCON_VOIE_FERREE_4326", con))
                 {
                     AddSpatialIntersectionPredicate(com, "geom4326", polyQuery);
 
@@ -82,10 +86,10 @@ namespace SncfOpenData
 
 
             //List<SqlGeography> geogList120 = new List<SqlGeography>();
-            //using (SqlConnection con = new SqlConnection("Data Source=ASUS;Initial Catalog=Sncf;Integrated Security=True"))
+            //using (SqlConnection con = new SqlConnection(connectionString))
             //{
             //    con.Open();
-            //    using (SqlCommand com = new SqlCommand("SELECT [geom4326].STAsBinary() FROM TRONCON_VOIE_FERREE_120_4326", con))
+            //    using (SqlCommand com = new SqlCommand("SELECT [geom4326].STAsBinary() FROM TRONCON_VOIE_FERREE_4326", con))
             //    {
             //        AddSpatialIntersectionPredicate(com, "geom4326", polyQuery);
             //        using (SqlDataReader reader = com.ExecuteReader())
