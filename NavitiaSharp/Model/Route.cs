@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace NavitiaSharp
 {
-    public class Route
+    public class Route : IApiResource
     {
 
         [DeserializeAs(Name = "direction")]

@@ -40,6 +40,8 @@ namespace SncfOpenData
             //repo.SaveStaticData();
             // Line line = sncfApi.GetLine("line:OCE:SN-87276055-87276139");
 
+            //repo.GetAndSavedRelatedData<Line, StopArea>(repo.Api, repo.DataPack.Lines, "lines/{id}/stop_areas", DATA_DIR_SNCF, "lines.stop_areas.json");
+            //repo.GetAndSavedRelatedData<Route, StopArea>(repo.Api, repo.DataPack.Routes, "routes/{id}/stop_areas", DATA_DIR_SNCF, "routes.stop_areas.json");
 
             // TODO : get all route stop areas
             // we can then map to geo network with a little Dijkstra for each route
@@ -62,6 +64,8 @@ namespace SncfOpenData
             str2Find = "AIX-EN-PROVENCE";
             repo.TestQueryWithStopName(str2Find);
             str2Find = "MARSEILLE";
+            repo.TestQueryWithStopName(str2Find);
+            str2Find = "NICE";
             repo.TestQueryWithStopName(str2Find);
 
 

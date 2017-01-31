@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace NavitiaSharp
 {
-    public class Line : IEquatable<Line>
+    public class Line : IEquatable<Line>, IApiResource
     {
         [DeserializeAs(Name = "code")]
         public string Code { get; set; }

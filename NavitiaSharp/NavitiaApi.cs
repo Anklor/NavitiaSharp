@@ -46,6 +46,10 @@ namespace SncfOpenData
             var client = new RestClient();
             client.BaseUrl = new Uri(_baseUrl);
             client.Authenticator = new HttpBasicAuthenticator(_apiKey, null);
+            if (resourcePath.Contains("/"))
+            {
+                resourcePath = resourcePath.Split('/').Last();
+            }
             client.AddHandler("application/json", new NavitiaSharp.Deserializers.JsonDeserializer(resourcePath));
 
             request.RequestFormat = DataFormat.Json;

@@ -49,6 +49,7 @@
     <Compile Include="Model\AdministrativeRegion.cs" />
     <Compile Include="Model\Disruption.cs" />
     <Compile Include="Model\ImpactedObject.cs" />
+    <Compile Include="Model\IResource.cs" />
     <Compile Include="Model\PtObject.cs" />
     <Compile Include="Model\JourneyPattern.cs" />
     <Compile Include="Model\Network.cs" />

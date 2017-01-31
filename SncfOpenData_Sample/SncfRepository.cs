@@ -1,6 +1,7 @@
 ﻿using NavitiaSharp;
 using Newtonsoft.Json;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Diagnostics;
@@ -54,9 +55,11 @@ namespace SncfOpenData
             pack.Routes = LoadSavedDataList<Route>("routes.json");
             pack.StopAreas = LoadSavedDataList<StopArea>("stop_areas.json");
             pack.StopPoints = LoadSavedDataList<StopPoint>("stop_points.json");
+            pack.LinesStopAreas = LoadSavedData<Dictionary<string, List<StopArea>>>("lines.stop_areas.json");
+            pack.RoutesStopAreas = LoadSavedData<Dictionary<string, List<StopArea>>>("routes.stop_areas.json");
             //pack.LineRouteSchedules = pack.Lines.Select(line => new { lineId = line.Id, schedules = GetLineRouteSchedules(line, false) })
             //                                      .ToDictionary(a => a.lineId, a => a.schedules);
-            pack.LineRouteSchedules = LoadSavedData<Dictionary<string, List<RouteSchedule>>>("linesroutesschedules.json");
+            //pack.LineRouteSchedules = LoadSavedData<Dictionary<string, List<RouteSchedule>>>("linesroutesschedules.json");
 
 
             return pack;
@@ -215,8 +218,6 @@ namespace SncfOpenData
 
             return v_ret;
         }
-
-
         private HashSet<string> ExtractVehiculeJourneysFromRouteSchedule(RouteSchedule routeSchedule)
         {
             //Table / Links / Type "vehicle_journey"
@@ -272,19 +273,87 @@ namespace SncfOpenData
         /// <param name="sncfApi"></param>
         private void SaveStaticData(SncfApi sncfApi, string dataDir)
         {
-            GetAndSaveData<Line>(sncfApi, "lines", dataDir, "lines.json");
+            var lines = GetAndSaveData<Line>(sncfApi, "lines", dataDir, "lines.json");
             GetAndSaveData<StopArea>(sncfApi, "stop_areas", dataDir, "stop_areas.json");
             GetAndSaveData<Route>(sncfApi, "routes", dataDir, "routes.json");
             GetAndSaveData<StopPoint>(sncfApi, "stop_points", dataDir, "stop_points.json");
+            GetAndSavedRelatedData<Line, StopArea>(sncfApi, lines, "lines/{id}/stop_areas", dataDir, "lines.stop_areas.json");
+
         }
 
-        void GetAndSaveData<T>(SncfApi sncfApi, string endpoint, string dataDir, string fileName) where T : new()
+        public Dictionary<string, List<TRelated>> GetAndSavedRelatedData<TBase, TRelated>(SncfApi sncfApi,
+                                                                                            List<TBase> baseResourceList,
+                                                                                            string patternPathToRelatedResource,
+                                                                                            string dataDirectory,
+                                                                                            string outputFileName) where TBase : IApiResource, new()
+                                                                                                                   where TRelated : new()
+        {
+            //Dictionary<string, List<TRelated>> dic = new Dictionary<string, List<TRelated>>();
+            ConcurrentDictionary<string, List<TRelated>> dic = new ConcurrentDictionary<string, List<TRelated>>();
+
+            Parallel.ForEach(baseResourceList, baseItem =>
+            {
+                try
+                {
+                    List<TRelated> allRelatedItems = GetAllPagedResults<TRelated>(sncfApi, patternPathToRelatedResource.Replace("{id}", baseItem.Id), 100);
+                    dic.AddOrUpdate(baseItem.Id, allRelatedItems, AddRelatedItem);
+                }
+                catch (KeyNotFoundException v_notFoundException)
+                {
+                    dic.AddOrUpdate(baseItem.Id, new List<TRelated>(), AddRelatedItem);
+                    Trace.TraceWarning("GetAndSavedRelatedData. Not found.");
+                }
+                catch (Exception v_ex)
+                {
+                    Trace.TraceWarning($"GetAndSavedRelatedData. Error : {v_ex.Message}");
+                }
+
+            }
+            );
+            //foreach (TBase baseItem in baseResourceList)
+            //{
+            //    try
+            //    {
+            //        List<TRelated> allRelatedItems = GetAllPagedResults<TRelated>(sncfApi, patternPathToRelatedResource.Replace("{id}", baseItem.Id), 100);
+            //        dic.AddOrUpdate(baseItem.Id, allRelatedItems, AddRelatedItem);
+            //    }
+            //    catch(KeyNotFoundException v_notFoundException)
+            //    {
+            //        dic.AddOrUpdate(baseItem.Id, new List<TRelated>(), AddRelatedItem);
+            //        Trace.TraceWarning("GetAndSavedRelatedData. Not found.");
+            //    }
+            //    catch (Exception v_ex)
+            //    {
+            //        Trace.TraceWarning($"GetAndSavedRelatedData. Error : {v_ex.Message}");
+            //    }
+
+            //}
+
+            //var json = JsonConvert.SerializeObject(dic, Formatting.None);
+            //File.WriteAllText(Path.Combine(dataDirectory, outputFileName), json);
+
+            Dictionary<string, List<TRelated>> outDic = new Dictionary<string, List<TRelated>>();
+            outDic = dic.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+
+            var json = JsonConvert.SerializeObject(outDic, Formatting.None);
+            File.WriteAllText(Path.Combine(dataDirectory, outputFileName), json);
+            return outDic;
+        }
+
+        private List<TRelated> AddRelatedItem<TRelated>(string arg1, List<TRelated> arg2) where TRelated : new()
+        {
+            return arg2;
+        }
+
+        List<T> GetAndSaveData<T>(SncfApi sncfApi, string endpoint, string dataDir, string fileName) where T : new()
         {
             CheckDirExists(dataDir);
 
             List<T> allItems = GetAllPagedResults<T>(sncfApi, endpoint);
             var json = JsonConvert.SerializeObject(allItems, Formatting.None);
             File.WriteAllText(Path.Combine(dataDir, fileName), json);
+
+            return allItems;
         }
 
 
