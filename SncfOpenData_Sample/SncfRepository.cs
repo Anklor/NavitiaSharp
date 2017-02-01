@@ -65,7 +65,7 @@ namespace SncfOpenData
             return pack;
         }
 
-        private List<T> LoadSavedDataList<T>(string fileName)
+        public List<T> LoadSavedDataList<T>(string fileName)
         {
             string fullFileName = Path.Combine(_dataDirectory, fileName);
             if (File.Exists(fullFileName))
@@ -79,7 +79,7 @@ namespace SncfOpenData
                 return new List<T>();
             }
         }
-        private T LoadSavedData<T>(string fileName)
+        public T LoadSavedData<T>(string fileName)
         {
             string fullFileName = Path.Combine(_dataDirectory, fileName);
             if (File.Exists(fullFileName))
