@@ -36,8 +36,25 @@ namespace SncfOpenData
 
             SncfRepository repo = new SncfRepository(DATA_DIR_SNCF, 1000);
 
-            //MatchStopAreasWithIGNNodes(repo, null); // 1st pass
-            MatchStopAreasWithIGNNodes(repo, repo.LoadSavedDataList<StopAreaIGN>("stopAreasIgn.json")); // 2nd pass
+            var areasIgn = repo.LoadSavedDataList<StopAreaIGN>("stopAreasIgn.json"));
+
+            areasIgn = MatchStopAreasWithIGNNodes(repo, null); // 1st pass
+            areasIgn = MatchStopAreasWithIGNNodes(repo, areasIgn);// 2nd pass
+            
+
+            var json = JsonConvert.SerializeObject(areasIgn, Formatting.Indented);
+            File.WriteAllText(Path.Combine(DATA_DIR_SNCF, "stopAreasIgn.json"), json);
+
+            //select N.ID_RTE500 As ID_NOEUD
+		          //  ,T.ID_RTE500 as ID_TRONCON
+            //from NOEUD_FERRE_2154 N
+            //left
+            //join TRONCON_VOIE_FERREE_2154 T
+
+            //on N.geom2154.STIntersects(T.geom2154) = 1
+            //order by ID_NOEUD
+
+
             //ShowStopAreasOnMap(repo, "POLYGON((5.2734375 43.259580971072275,5.41351318359375 43.1614915129406,5.4986572265625 43.295574211963746,5.5810546875 43.42936191764414,5.90789794921875 43.57678451504994,5.877685546875 43.74766111392921,5.88043212890625 43.86064850339098,5.62225341796875 43.75559702541283,5.4327392578125 43.670230832122314,5.27069091796875 43.58474304793296,5.23773193359375 43.431356514362626,5.2734375 43.259580971072275))");
 
             // Saves data identified as "static", ie: does not change often and can save remote Hits
@@ -227,7 +244,7 @@ namespace SncfOpenData
             SpatialTrace.Disable();
         }
 
-        private static void MatchStopAreasWithIGNNodes(SncfRepository repo, List<StopAreaIGN> stopAreasIgn)
+        private static List<StopAreaIGN> MatchStopAreasWithIGNNodes(SncfRepository repo, List<StopAreaIGN> stopAreasIgn)
         {
             // Work in L93 proj : use of more funcs on geometry types, and distance calculations done in meters
 
@@ -356,9 +373,7 @@ namespace SncfOpenData
                 #endregion
             }
 
-            var json = JsonConvert.SerializeObject(stopAreasIgn, Formatting.Indented);
-            File.WriteAllText(Path.Combine(DATA_DIR_SNCF, "stopAreasIgn.json"), json);
-
+            return stopAreasIgn;
         }
 
 
