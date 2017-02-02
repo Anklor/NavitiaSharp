@@ -2,6 +2,8 @@
 using Microsoft.SqlServer.Types;
 using NavitiaSharp;
 using Newtonsoft.Json;
+using SncfOpenData.IGN;
+using SncfOpenData.IGN.Model;
 using SncfOpenData.Model;
 using SqlServerSpatial.Toolkit;
 using System;
@@ -25,21 +27,18 @@ namespace SncfOpenData
     {
         const string DATA_DIR_SNCF = @"..\..\..\Data\SNCF";
         const string DATA_DIR_IGN = @"..\..\..\Data\IGN";
-        static string CONN_STRING;
-
+        
         [STAThread()]
         static void Main(string[] args)
         {
-            AppDomain.CurrentDomain.SetData("DataDirectory", Path.GetFullPath(DATA_DIR_IGN));
-            SqlServerTypes.Utilities.LoadNativeAssemblies(AppDomain.CurrentDomain.BaseDirectory);
-            CONN_STRING = ConfigurationManager.ConnectionStrings["IGNData"].ConnectionString;
-
+            
+            RailroadService ignService = new RailroadService(Path.Combine(DATA_DIR_IGN, "IGN_ROUTE500_SNCF.mdf"));
             SncfRepository repo = new SncfRepository(DATA_DIR_SNCF, 1000);
 
-            var areasIgn = repo.LoadSavedDataList<StopAreaIGN>("stopAreasIgn.json"));
+            var areasIgn = repo.LoadSavedDataList<StopAreaIGN>("stopAreasIgn.json");
 
-            areasIgn = MatchStopAreasWithIGNNodes(repo, null); // 1st pass
-            areasIgn = MatchStopAreasWithIGNNodes(repo, areasIgn);// 2nd pass
+            areasIgn = MatchStopAreasWithIGNNodes(repo, ignService, null); // 1st pass
+            areasIgn = MatchStopAreasWithIGNNodes(repo, ignService, areasIgn);// 2nd pass
             
 
             var json = JsonConvert.SerializeObject(areasIgn, Formatting.Indented);
@@ -95,73 +94,35 @@ namespace SncfOpenData
 
 
 
-        private static void MatchLinesWithGeom(SncfRepository repo)
+        private static void MatchLinesWithGeom(SncfRepository repo, RailroadService railroads)
         {
             // Work in L93 proj : use of more funcs on geometry types, and distance calculations done in meters
             /****** Script de la commande SelectTopNRows à partir de SSMS  ******/
 
 
             // Full db read
-            Dictionary<int, SqlGeometry> geomList2154 = new Dictionary<int, SqlGeometry>();
-
-            using (SqlConnection con = new SqlConnection(CONN_STRING))
-            {
-                con.Open();
-                using (SqlCommand com = new SqlCommand("SELECT ID_RTE500, geom2154.STAsBinary() FROM[dbo].[TRONCON_VOIE_FERREE_2154]", con))
-                {
-                    using (SqlDataReader reader = com.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            int id = (int)reader[0];
-                            SqlGeometry geom2154 = SqlGeometry.STGeomFromWKB(reader.GetSqlBytes(1), 2154);
-                            geomList2154.Add(id, geom2154);
-                        }
-                    }
-                }
-            }
-
-            Dictionary<int, SqlGeometry> geomNoeuds2154 = new Dictionary<int, SqlGeometry>();
-            Dictionary<int, string> geomNoeuds2154NAme = new Dictionary<int, string>();
-
-            using (SqlConnection con = new SqlConnection(CONN_STRING))
-            {
-                con.Open();
-                using (SqlCommand com = new SqlCommand("SELECT geom2154.STAsBinary(),ID_RTE500,TOPONYME FROM [dbo].[NOEUD_FERRE_2154] WHERE NATURE IN ('Gare de voyageurs','Gare de voyageurs et de fret')", con))
-                {
-                    using (SqlDataReader reader = com.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            SqlGeometry geom2154 = SqlGeometry.STGeomFromWKB(reader.GetSqlBytes(0), 2154);
-                            int id = (int)reader[1];
-                            string name = reader[2].ToString();
-                            geomNoeuds2154.Add(id, geom2154);
-                            geomNoeuds2154NAme.Add(id, name);
-                        }
-                    }
-                }
-            }
-
+            Dictionary<int, Troncon> allTroncons = railroads.GetAllTroncons_Lambert93();
+            Dictionary<int, Noeud> allNodes = railroads.GetAllNoeuds_Lambert93();
+                        
             //foreach (StopArea area in repo.DataPack.StopAreas)
             List<StopAreaIGN> stopAreasIgn = new List<StopAreaIGN>();
             Parallel.ForEach(repo.DataPack.StopAreas, area =>
             {
                 StopAreaIGN areaIgn = new StopAreaIGN { StopAreaId = area.Id };
 
-                var closestIgnPoints = from geom in geomNoeuds2154
+                var closestIgnPoints = from noeud in allNodes
                                        let area2154 = FromCoordToGeometry2154(area.Coord)
-                                       let dist = geom.Value.STDistance(area2154).Value
+                                       let dist = noeud.Value.Geometry.STDistance(area2154).Value
                                        where dist < 500
                                        orderby dist
-                                       select new { Distance = dist, StopArea = area, CoordL93 = area2154, IGNObject = geom };
+                                       select new { Distance = dist, StopArea = area, CoordL93 = area2154, IGNObject = noeud };
 
                 if (closestIgnPoints.Any())
                 {
                     var res = closestIgnPoints.First();
-                    Trace.TraceInformation($"{area.Name}: point {geomNoeuds2154NAme[res.IGNObject.Key]} at {(int)Math.Round(res.Distance, 0)}");
+                    Trace.TraceInformation($"{area.Name}: point {res.IGNObject.Value.Toponyme} at {(int)Math.Round(res.Distance, 0)}");
                     areaIgn.IdNoeud = res.IGNObject.Key;
-                    areaIgn.NomNoeud = geomNoeuds2154NAme[res.IGNObject.Key];
+                    areaIgn.NomNoeud = res.IGNObject.Value.Toponyme;
                     areaIgn.DistanceNoeud = res.Distance;
 
                 }
@@ -191,16 +152,16 @@ namespace SncfOpenData
                         //SqlGeometry area2154 = FromCoordToGeometry2154(area.Coord);
 
 
-                        var closestIgnRoutes = from geom in geomList2154
+                        var closestIgnRoutes = from geom in allTroncons
                                                let area2154 = FromCoordToGeometry2154(area.Coord)
-                                               let dist = geom.Value.STDistance(area2154).Value
+                                               let dist = geom.Value.Geometry.STDistance(area2154).Value
                                                where dist < 500
                                                orderby dist
                                                select new { Distance = dist, StopArea = area, CoordL93 = area2154, IGNObject = geom };
 
-                        var closestIgnPoints = from geom in geomNoeuds2154
+                        var closestIgnPoints = from geom in allNodes
                                                let area2154 = FromCoordToGeometry2154(area.Coord)
-                                               let dist = geom.Value.STDistance(area2154).Value
+                                               let dist = geom.Value.Geometry.STDistance(area2154).Value
                                                where dist < 500
                                                orderby dist
                                                select new { Distance = dist, StopArea = area, CoordL93 = area2154, IGNObject = geom };
@@ -219,7 +180,7 @@ namespace SncfOpenData
                             int idRte500 = result.IGNObject.Key;
 
                             // line
-                            SpatialTrace.TraceGeometry(result.IGNObject.Value, result.IGNObject.Key + " " + result.Distance.ToString(), result.IGNObject.Key + " " + result.Distance.ToString());
+                            SpatialTrace.TraceGeometry(result.IGNObject.Value.Geometry, result.IGNObject.Key + " " + result.Distance.ToString(), result.IGNObject.Key + " " + result.Distance.ToString());
 
                         }
                         SpatialTrace.SetFillColor(Colors.Blue);
@@ -228,7 +189,7 @@ namespace SncfOpenData
                             int idRte500 = result.IGNObject.Key;
 
                             // point
-                            SpatialTrace.TraceGeometry(result.IGNObject.Value.STBuffer(100), result.IGNObject.Key + " " + result.Distance.ToString(), result.IGNObject.Key + " " + result.Distance.ToString());
+                            SpatialTrace.TraceGeometry(result.IGNObject.Value.Geometry.STBuffer(100), result.IGNObject.Key + " " + result.Distance.ToString(), result.IGNObject.Key + " " + result.Distance.ToString());
 
                         }
 
@@ -244,53 +205,16 @@ namespace SncfOpenData
             SpatialTrace.Disable();
         }
 
-        private static List<StopAreaIGN> MatchStopAreasWithIGNNodes(SncfRepository repo, List<StopAreaIGN> stopAreasIgn)
+        private static List<StopAreaIGN> MatchStopAreasWithIGNNodes(SncfRepository repo, RailroadService railroads, List<StopAreaIGN> stopAreasIgn)
         {
             // Work in L93 proj : use of more funcs on geometry types, and distance calculations done in meters
 
             // Full db read
             #region Full DB read
 
-            Dictionary<int, SqlGeometry> DBgeomList2154 = new Dictionary<int, SqlGeometry>();
+            Dictionary<int, Troncon> allTroncons = railroads.GetAllTroncons_Lambert93();
+            Dictionary<int, Noeud> allNoeuds = railroads.GetAllNoeuds_Lambert93();
 
-            using (SqlConnection con = new SqlConnection(CONN_STRING))
-            {
-                con.Open();
-                using (SqlCommand com = new SqlCommand("SELECT ID_RTE500, geom2154.STAsBinary() FROM[dbo].[TRONCON_VOIE_FERREE_2154]", con))
-                {
-                    using (SqlDataReader reader = com.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            int id = (int)reader[0];
-                            SqlGeometry geom2154 = SqlGeometry.STGeomFromWKB(reader.GetSqlBytes(1), 2154);
-                            DBgeomList2154.Add(id, geom2154);
-                        }
-                    }
-                }
-            }
-
-            Dictionary<int, SqlGeometry> DBgeomNoeuds2154 = new Dictionary<int, SqlGeometry>();
-            Dictionary<int, string> DBgeomNoeuds2154NAme = new Dictionary<int, string>();
-
-            using (SqlConnection con = new SqlConnection(CONN_STRING))
-            {
-                con.Open();
-                using (SqlCommand com = new SqlCommand("SELECT geom2154.STAsBinary(),ID_RTE500,TOPONYME FROM [dbo].[NOEUD_FERRE_2154] WHERE NATURE IN ('Gare de voyageurs','Gare de voyageurs et de fret')", con))
-                {
-                    using (SqlDataReader reader = com.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            SqlGeometry geom2154 = SqlGeometry.STGeomFromWKB(reader.GetSqlBytes(0), 2154);
-                            int id = (int)reader[1];
-                            string name = reader[2].ToString();
-                            DBgeomNoeuds2154.Add(id, geom2154);
-                            DBgeomNoeuds2154NAme.Add(id, name);
-                        }
-                    }
-                }
-            }
             #endregion
 
             if (stopAreasIgn == null)
@@ -298,23 +222,24 @@ namespace SncfOpenData
                 #region 1st pass : match within 500 meters (CPU intensive)
 
                 stopAreasIgn = new List<StopAreaIGN>();
-                Parallel.ForEach(repo.DataPack.StopAreas, area =>
+                //Parallel.ForEach(repo.DataPack.StopAreas, area =>
+                foreach(StopArea area in repo.DataPack.StopAreas)
                 {
                     StopAreaIGN areaIgn = new StopAreaIGN { StopAreaId = area.Id };
-
-                    var closestIgnPoints = from geom in DBgeomNoeuds2154
-                                           let area2154 = FromCoordToGeometry2154(area.Coord)
-                                           let dist = geom.Value.STDistance(area2154).Value
-                                           where dist < 500
+                    var area2154 = FromCoordToGeometry2154(area.Coord);
+                    var closestIgnPoints = from noeud in allNoeuds
+                                           let dist = noeud.Value.Geometry.STDistance(area2154).Value
+                                           where dist < 100
                                            orderby dist
-                                           select new { Distance = dist, StopArea = area, CoordL93 = area2154, IGNObject = geom };
+                                           select new { Distance = dist, StopArea = area, CoordL93 = area2154, IGNObject = noeud.Value };
 
-                    if (closestIgnPoints.Any())
+                    var res = closestIgnPoints.FirstOrDefault();
+                    if (res != null)
                     {
-                        var res = closestIgnPoints.First();
-                        Trace.TraceInformation($"{area.Name}: point {DBgeomNoeuds2154NAme[res.IGNObject.Key]} at {(int)Math.Round(res.Distance, 0)}");
-                        areaIgn.IdNoeud = res.IGNObject.Key;
-                        areaIgn.NomNoeud = DBgeomNoeuds2154NAme[res.IGNObject.Key];
+                        
+                        Trace.TraceInformation($"{area.Name}: point {res.IGNObject.Toponyme} at {(int)Math.Round(res.Distance, 0)}");
+                        areaIgn.IdNoeud = res.IGNObject.Id;
+                        areaIgn.NomNoeud = res.IGNObject.Toponyme;
                         areaIgn.DistanceNoeud = res.Distance;
 
                     }
@@ -325,7 +250,7 @@ namespace SncfOpenData
                     stopAreasIgn.Add(areaIgn);
 
                 }
-                );
+                //);
 
                 #endregion
 
@@ -339,26 +264,28 @@ namespace SncfOpenData
                 foreach (var stopAreaIgn in stopAreasIgn_NonMatched)
                 {
                     StopArea area = repo.DataPack.StopAreas.Where(s => s.Id == stopAreaIgn.StopAreaId).Single();
-                    var closestIgnPoints = from geom in DBgeomNoeuds2154
-                                           let area2154 = FromCoordToGeometry2154(area.Coord)
-                                           let dist = geom.Value.STDistance(area2154).Value
+
+                    var area2154 = FromCoordToGeometry2154(area.Coord);
+
+                    var closestIgnPoints = from noeud in allNoeuds
+                                           let dist = noeud.Value.Geometry.STDistance(area2154).Value
                                            where dist < 30000
                                            orderby dist
-                                           select new { Distance = dist, StopArea = area, CoordL93 = area2154, IGNObject = geom };
+                                           select new { Distance = dist, StopArea = area, CoordL93 = area2154, IGNObject = noeud.Value };
 
                     if (closestIgnPoints.Any())
                     {
                         var res = closestIgnPoints.First();
-                        if (DBgeomNoeuds2154NAme[res.IGNObject.Key].ToUpper().Trim() == area.Name.ToUpper().Trim())
+                        if (allNoeuds[res.IGNObject.Id].Toponyme.ToUpper().Trim() == area.Name.ToUpper().Trim())
                         {
                             //Trace.TraceInformation($"{area.Name}: point {DBgeomNoeuds2154NAme[res.IGNObject.Key]} at {(int)Math.Round(res.Distance, 0)}");
-                            stopAreaIgn.IdNoeud = res.IGNObject.Key;
-                            stopAreaIgn.NomNoeud = DBgeomNoeuds2154NAme[res.IGNObject.Key];
+                            stopAreaIgn.IdNoeud = res.IGNObject.Id;
+                            stopAreaIgn.NomNoeud = res.IGNObject.Toponyme;
                             stopAreaIgn.DistanceNoeud = res.Distance;
                         }
                         else
                         {
-                            Trace.TraceWarning($"WARN : {area.Name} does not match with point {DBgeomNoeuds2154NAme[res.IGNObject.Key]}. Distance : {(int)Math.Round(res.Distance, 0)}");
+                            Trace.TraceWarning($"WARN : {area.Name} does not match with point {res.IGNObject.Toponyme}. Distance : {(int)Math.Round(res.Distance, 0)}");
 
                         }
                     }
@@ -378,51 +305,13 @@ namespace SncfOpenData
 
 
 
-        private static void ShowStopAreasOnMap(SncfRepository repo, string wkt = null)
+        private static void ShowStopAreasOnMap(SncfRepository repo, RailroadService railRoadService, string wkt = null)
         {
 
             SqlGeography polyQuery = wkt == null ? null : SqlGeography.STGeomFromText(new SqlChars(new SqlString(wkt)), 4326);
+            Dictionary<int, Noeud> noeuds = railRoadService.GetAllNoeuds_LatLon(polyQuery);
 
-            List<SqlGeography> geogList500 = new List<SqlGeography>();
-
-            using (SqlConnection con = new SqlConnection(CONN_STRING))
-            {
-                con.Open();
-                using (SqlCommand com = new SqlCommand("SELECT [ID],[NATURE],[ENERGIE],[geom4326].STAsBinary() FROM TRONCON_VOIE_FERREE_4326", con))
-                {
-                    AddSpatialIntersectionPredicate(com, "geom4326", polyQuery);
-
-                    using (SqlDataReader reader = com.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            SqlGeography geog = SqlGeography.STGeomFromWKB(reader.GetSqlBytes(3), 4326);
-                            geogList500.Add(geog);
-                        }
-                    }
-                }
-            }
-
-
-
-            //List<SqlGeography> geogList120 = new List<SqlGeography>();
-            //using (SqlConnection con = new SqlConnection(connectionString))
-            //{
-            //    con.Open();
-            //    using (SqlCommand com = new SqlCommand("SELECT [geom4326].STAsBinary() FROM TRONCON_VOIE_FERREE_4326", con))
-            //    {
-            //        AddSpatialIntersectionPredicate(com, "geom4326", polyQuery);
-            //        using (SqlDataReader reader = com.ExecuteReader())
-            //        {
-            //            while (reader.Read())
-            //            {
-            //                SqlGeography geog = SqlGeography.STGeomFromWKB(reader.GetSqlBytes(0), 4326);
-            //                geogList120.Add(geog);
-            //            }
-            //        }
-            //    }
-            //}
-
+          
             Dictionary<string, SqlGeography> geogListStopAreas = new Dictionary<string, SqlGeography>();
             IEnumerable<StopArea> stopAreas = repo.DataPack.StopAreas;
             if (polyQuery != null)
@@ -447,7 +336,7 @@ namespace SncfOpenData
 
             SpatialTrace.Enable();
             int i = 0;
-            foreach (var g in geogList500)
+            foreach (var g in noeuds)
             {
                 if (i % 2 == 0)
                 {
@@ -457,7 +346,7 @@ namespace SncfOpenData
                 {
                     SpatialTrace.SetLineColor(Colors.Red);
                 }
-                SpatialTrace.TraceGeometry(g, "Lignes 500", "Lignes 500");
+                SpatialTrace.TraceGeometry(g.Value.Geometry, $"{g.Value.Id}: {g.Value.Toponyme}", $"{g.Value.Id}: {g.Value.Toponyme}");
                 i++;
             }
 
