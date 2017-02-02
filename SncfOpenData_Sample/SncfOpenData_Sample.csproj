@@ -65,15 +65,16 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="App\CoreService.cs" />
     <Compile Include="IGN\Model\Noeud.cs" />
     <Compile Include="IGN\Model\Projection.cs" />
     <Compile Include="IGN\Model\Troncon.cs" />
-    <Compile Include="IGN\RailroadService.cs" />
+    <Compile Include="IGN\IGNRepository.cs" />
     <Compile Include="Model\StopAreaIGN.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="SncfDataPack.cs" />
-    <Compile Include="SncfRepository.cs" />
+    <Compile Include="Sncf\SncfDataPack.cs" />
+    <Compile Include="Sncf\SncfRepository.cs" />
     <Compile Include="Sncf\SncfApi.cs" />
     <Compile Include="SqlServerTypes\Loader.cs" />
   </ItemGroup>

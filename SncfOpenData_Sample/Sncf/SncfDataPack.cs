@@ -16,5 +16,7 @@ namespace SncfOpenData
         public Dictionary<string, List<RouteSchedule>> LineRouteSchedules { get; set; }
         public Dictionary<string, List<StopArea>> LinesStopAreas { get; internal set; }
         public Dictionary<string, List<StopArea>> RoutesStopAreas { get; internal set; }
+        public Dictionary<string, int> IgnNodeByStopArea { get; internal set; }
+        public Dictionary<int, HashSet<string>> StopAreaByIgnNode { get; internal set; }
     }
 }

@@ -5,15 +5,13 @@ using System.Collections.Generic;
 using System.Data.SqlClient;
 using System.Linq;
 using SqlServerSpatial.Toolkit;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace SncfOpenData.IGN
 {
-    public class RailroadService
+    public class IGNRepository
     {
         private readonly string ConnectionString;
-        public RailroadService(string databasePath)
+        public IGNRepository(string databasePath)
         {
             SqlServerTypes.Utilities.LoadNativeAssemblies(AppDomain.CurrentDomain.BaseDirectory);
             ConnectionString = $"Data Source=(localdb)\\v11.0;AttachDbFilename={System.IO.Path.GetFullPath(databasePath)};Integrated Security=True";
@@ -76,6 +74,7 @@ namespace SncfOpenData.IGN
 
         public Dictionary<int, Noeud> GetAllNoeuds_LatLon(SqlGeography polyQuery)
         {
+
             SqlGeometry geomQuery = null;
             if (polyQuery.TryToGeometry(out geomQuery))
             {
@@ -89,7 +88,7 @@ namespace SncfOpenData.IGN
                 return GetAllNoeuds_Lambert93()
                     .ToDictionary(kvp => kvp.Key, kvp => ReprojectNoeud(kvp.Value, 4326));
             }
-          
+
             //using (SqlConnection con = new SqlConnection(CONN_STRING))
             //{
             //    con.Open();
@@ -109,7 +108,7 @@ namespace SncfOpenData.IGN
             //}
 
         }
-
+        
         private Noeud ReprojectNoeud(Noeud value, int srid)
         {
             value.Geometry = value.Geometry.ReprojectTo(srid);

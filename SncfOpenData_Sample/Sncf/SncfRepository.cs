@@ -1,5 +1,6 @@
 ﻿using NavitiaSharp;
 using Newtonsoft.Json;
+using SncfOpenData.Model;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -7,7 +8,6 @@ using System.Configuration;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace SncfOpenData
@@ -57,6 +57,20 @@ namespace SncfOpenData
             pack.StopPoints = LoadSavedDataList<StopPoint>("stop_points.json");
             pack.LinesStopAreas = LoadSavedData<Dictionary<string, List<StopArea>>>("lines.stop_areas.json");
             pack.RoutesStopAreas = LoadSavedData<Dictionary<string, List<StopArea>>>("routes.stop_areas.json");
+
+            var stopareasIgn = LoadSavedDataList<StopAreaIGN>("stopAreasIgn.json");
+            pack.IgnNodeByStopArea = stopareasIgn.ToDictionary(kvp => kvp.StopAreaId, kvp => kvp.IdNoeud);
+            //pack.StopAreaByIgnNode = stopareasIgn.Where(kvp => kvp.IdNoeud != 0).ToDictionary(kvp => kvp.IdNoeud, kvp => kvp.StopAreaId);
+            pack.StopAreaByIgnNode = new Dictionary<int, HashSet<string>>();
+            foreach (var kvp in stopareasIgn.Where(kvp => kvp.IdNoeud != 0))
+            {
+                if (pack.StopAreaByIgnNode.ContainsKey(kvp.IdNoeud) == false)
+                {
+                    pack.StopAreaByIgnNode[kvp.IdNoeud] = new HashSet<string>();
+                }
+                pack.StopAreaByIgnNode[kvp.IdNoeud].Add(kvp.StopAreaId);
+            }
+
             //pack.LineRouteSchedules = pack.Lines.Select(line => new { lineId = line.Id, schedules = GetLineRouteSchedules(line, false) })
             //                                      .ToDictionary(a => a.lineId, a => a.schedules);
             //pack.LineRouteSchedules = LoadSavedData<Dictionary<string, List<RouteSchedule>>>("linesroutesschedules.json");
