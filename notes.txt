@@ -50,22 +50,25 @@ ON N.geom2154.STIntersects(T.geom2154) =1
 ORDER BY N.ID_RTE500
 
 
-select	N.ID_RTE500 AS ID_NOEUD
-		, T.ID_RTE500 as ID_TRONCON
-		, T.geom2154
-from dbo.NOEUD_FERRE_2154 N
-left join dbo.TRONCON_VOIE_FERREE_2154 T
-ON N.geom2154.STIntersects(T.geom2154) =1
-where N.ID_RTE500 
-in(4101
-	,2040
-	,2927
-	,4102
-	,1857
-	,4172
-	,1866
-	,2917
-	,2196)
+declare @env geometry
+select @env = geometry::EnvelopeAggregate(geom2154) from NOEUD_FERRE_2154
+where ID_RTE500 in(1832,4065,1535,1843,3776,2396,2231,2870,1842,4344,2492,4064)
+
+	select	N.ID_RTE500 AS ID_NOEUD
+	, N.geom2154.STBuffer(200)
+	from NOEUD_FERRE_2154 N
+	where N.geom2154.STIntersects(@env) = 1
+union all
+	select	ID_RTE500 AS ID_TRONCON
+	,geom2154
+	from TRONCON_VOIE_FERREE_2154
+	where geom2154.STIntersects(@env) = 1
+union all
+	select	N.ID_RTE500 AS ID_NOEUD
+	, N.geom2154.STBuffer(1500)
+	from NOEUD_FERRE_2154 N
+	where N.ID_RTE500 in(1832,4065,1535,1843,3776,2396,2231,2870,1842,4344,2492,4064)
+
 
 ----------------------------------------
 

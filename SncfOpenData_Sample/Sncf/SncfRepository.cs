@@ -22,18 +22,117 @@ namespace SncfOpenData
             get { return _api; }
         }
 
-        private SncfDataPack _dataPackInternal;
-        public SncfDataPack DataPack
+        #region Data 
+
+        private List<Line> _lines;
+        public List<Line> Lines
         {
             get
             {
-                if (_dataPackInternal == null)
-                {
-                    _dataPackInternal = LoadDataPack();
-                }
-                return _dataPackInternal;
+                if (_lines == null) _lines = LoadSavedDataList<Line>("lines.json");
+                return _lines;
             }
+            internal set { _lines = value; }
         }
+
+        private List<Route> _routes;
+        public List<Route> Routes
+        {
+            get
+            {
+                if (_routes == null) _routes = LoadSavedDataList<Route>("routes.json");
+                return _routes;
+            }
+            internal set { _routes = value; }
+        }
+        private List<StopArea> _stopAreas;
+        public List<StopArea> StopAreas
+        {
+            get
+            {
+                if (_stopAreas == null) _stopAreas = LoadSavedDataList<StopArea>("stop_areas.json");
+                return _stopAreas;
+            }
+            internal set { _stopAreas = value; }
+        }
+        private List<StopPoint> _stopPoints;
+        public List<StopPoint> StopPoints
+        {
+            get
+            {
+                if (_stopPoints == null) _stopPoints = LoadSavedDataList<StopPoint>("stop_points.json");
+                return _stopPoints;
+            }
+            internal set { _stopPoints = value; }
+        }
+
+        private Dictionary<string, List<RouteSchedule>> _lineRouteSchedules;
+        public Dictionary<string, List<RouteSchedule>> LineRouteSchedules
+        {
+            get
+            {
+                //pack.LineRouteSchedules = pack.Lines.Select(line => new { lineId = line.Id, schedules = GetLineRouteSchedules(line, false) })
+                //                                      .ToDictionary(a => a.lineId, a => a.schedules);
+
+                if (_lineRouteSchedules == null) _lineRouteSchedules = LoadSavedData<Dictionary<string, List<RouteSchedule>>>("linesroutesschedules.json");
+                return _lineRouteSchedules;
+            }
+            internal set { _lineRouteSchedules = value; }
+        }
+        private Dictionary<string, List<StopArea>> _linesStopAreas;
+        public Dictionary<string, List<StopArea>> LinesStopAreas
+        {
+            get
+            {
+                if (_linesStopAreas == null) _linesStopAreas = LoadSavedData<Dictionary<string, List<StopArea>>>("lines.stop_areas.json");
+                return _linesStopAreas;
+            }
+            internal set { _linesStopAreas = value; }
+        }
+        private Dictionary<string, List<StopArea>> _routesStopAreas;
+        public Dictionary<string, List<StopArea>> RoutesStopAreas
+        {
+            get
+            {
+                if (_routesStopAreas == null) _routesStopAreas = LoadSavedData<Dictionary<string, List<StopArea>>>("routes.stop_areas.json");
+                return _routesStopAreas;
+            }
+            internal set { _routesStopAreas = value; }
+        }
+        private Dictionary<string, int> _ignNodeByStopArea;
+        public Dictionary<string, int> IgnNodeByStopArea
+        {
+            get
+            {
+                if (_ignNodeByStopArea == null) _ignNodeByStopArea = LoadSavedDataList<StopAreaIGN>("stopAreasIgn.json").ToDictionary(kvp => kvp.StopAreaId, kvp => kvp.IdNoeud);
+                return _ignNodeByStopArea;
+            }
+            internal set { _ignNodeByStopArea = value; }
+        }
+        private Dictionary<int, HashSet<string>> _stopAreaByIgnNode;
+        public Dictionary<int, HashSet<string>> StopAreaByIgnNode
+        {
+            get
+            {
+                if (_stopAreaByIgnNode == null)
+                {
+                    _stopAreaByIgnNode = new Dictionary<int, HashSet<string>>();
+                    foreach (var kvp in IgnNodeByStopArea.Where(kvp => kvp.Value != 0))
+                    {
+                        if (_stopAreaByIgnNode.ContainsKey(kvp.Value) == false)
+                        {
+                            _stopAreaByIgnNode[kvp.Value] = new HashSet<string>();
+                        }
+                        _stopAreaByIgnNode[kvp.Value].Add(kvp.Key);
+                    }
+                }
+                
+                return _stopAreaByIgnNode;
+            }
+            internal set { _stopAreaByIgnNode = value; }
+        }
+
+        #endregion
 
         const int DEFAULT_CHUNK_SIZE = 25;// 5000;
 
@@ -48,37 +147,7 @@ namespace SncfOpenData
             _api = new SncfApi(sncfAuthKey);
         }
 
-        public SncfDataPack LoadDataPack()
-        {
-            SncfDataPack pack = new SncfDataPack();
-            pack.Lines = LoadSavedDataList<Line>("lines.json");
-            pack.Routes = LoadSavedDataList<Route>("routes.json");
-            pack.StopAreas = LoadSavedDataList<StopArea>("stop_areas.json");
-            pack.StopPoints = LoadSavedDataList<StopPoint>("stop_points.json");
-            pack.LinesStopAreas = LoadSavedData<Dictionary<string, List<StopArea>>>("lines.stop_areas.json");
-            pack.RoutesStopAreas = LoadSavedData<Dictionary<string, List<StopArea>>>("routes.stop_areas.json");
-
-            var stopareasIgn = LoadSavedDataList<StopAreaIGN>("stopAreasIgn.json");
-            pack.IgnNodeByStopArea = stopareasIgn.ToDictionary(kvp => kvp.StopAreaId, kvp => kvp.IdNoeud);
-            //pack.StopAreaByIgnNode = stopareasIgn.Where(kvp => kvp.IdNoeud != 0).ToDictionary(kvp => kvp.IdNoeud, kvp => kvp.StopAreaId);
-            pack.StopAreaByIgnNode = new Dictionary<int, HashSet<string>>();
-            foreach (var kvp in stopareasIgn.Where(kvp => kvp.IdNoeud != 0))
-            {
-                if (pack.StopAreaByIgnNode.ContainsKey(kvp.IdNoeud) == false)
-                {
-                    pack.StopAreaByIgnNode[kvp.IdNoeud] = new HashSet<string>();
-                }
-                pack.StopAreaByIgnNode[kvp.IdNoeud].Add(kvp.StopAreaId);
-            }
-
-            //pack.LineRouteSchedules = pack.Lines.Select(line => new { lineId = line.Id, schedules = GetLineRouteSchedules(line, false) })
-            //                                      .ToDictionary(a => a.lineId, a => a.schedules);
-            //pack.LineRouteSchedules = LoadSavedData<Dictionary<string, List<RouteSchedule>>>("linesroutesschedules.json");
-
-
-            return pack;
-        }
-
+        
         public List<T> LoadSavedDataList<T>(string fileName)
         {
             string fullFileName = Path.Combine(_dataDirectory, fileName);
@@ -159,27 +228,27 @@ namespace SncfOpenData
 
         public void TestQueryWithStopName(string str2Find)
         {
-            var saQuery = DataPack.StopAreas.Where(obj => obj.Name.ToUpper().Contains(str2Find)).ToList();
-            var spQuery = DataPack.StopPoints.Where(obj => obj.Name.ToUpper().Contains(str2Find)).ToList();
-            var linesQuery = DataPack.Lines.Where(obj => obj.Routes != null && obj.Routes.Any(r => r.Direction.Name.ToUpper().Contains(str2Find))).ToList();
-            var routesQuery = DataPack.Routes.Where(obj => obj.Direction.Name.ToUpper().Contains(str2Find)).ToList();
+            var saQuery = StopAreas.Where(obj => obj.Name.ToUpper().Contains(str2Find)).ToList();
+            var spQuery = StopPoints.Where(obj => obj.Name.ToUpper().Contains(str2Find)).ToList();
+            var linesQuery = Lines.Where(obj => obj.Routes != null && obj.Routes.Any(r => r.Direction.Name.ToUpper().Contains(str2Find))).ToList();
+            var routesQuery = Routes.Where(obj => obj.Direction.Name.ToUpper().Contains(str2Find)).ToList();
         }
         public void TestQueryWithId(string idToFind)
         {
-            var saQuery = DataPack.StopAreas.Where(obj => obj.Id == idToFind).ToList();
-            var linesQuery = DataPack.Lines.Where(obj => obj.Id == idToFind).ToList();
-            var routesQuery = DataPack.Routes.Where(obj => obj.Id == idToFind).ToList();
-            var spQuery = DataPack.StopPoints.Where(obj => obj.Id == idToFind).ToList();
+            var saQuery = StopAreas.Where(obj => obj.Id == idToFind).ToList();
+            var linesQuery = Lines.Where(obj => obj.Id == idToFind).ToList();
+            var routesQuery = Routes.Where(obj => obj.Id == idToFind).ToList();
+            var spQuery = StopPoints.Where(obj => obj.Id == idToFind).ToList();
         }
 
         public void TestQueryWithStopAreaId(string idToFind)
         {
-            var saQuery = DataPack.StopAreas.Where(obj => obj.Id == idToFind).ToList();
-            var linesQuery = DataPack.Lines.Where(obj => obj.Routes != null && obj.Routes.Any(r => r.Direction.StopArea.Id == idToFind)).ToList();
-            var routesQuery = DataPack.Routes.Where(obj => obj.Direction.StopArea.Id == idToFind).ToList();
-            var spQuery = DataPack.StopPoints.Where(obj => obj.StopArea.Id == idToFind).ToList();
+            var saQuery = StopAreas.Where(obj => obj.Id == idToFind).ToList();
+            var linesQuery = Lines.Where(obj => obj.Routes != null && obj.Routes.Any(r => r.Direction.StopArea.Id == idToFind)).ToList();
+            var routesQuery = Routes.Where(obj => obj.Direction.StopArea.Id == idToFind).ToList();
+            var spQuery = StopPoints.Where(obj => obj.StopArea.Id == idToFind).ToList();
 
-            var routeSchedulesQueryFromMemory = DataPack.LineRouteSchedules.SelectMany(rs => rs.Value).Where(rs => rs.Table.Rows.Any(r => r.StopPoint.StopArea.Id == idToFind)).ToList();
+            var routeSchedulesQueryFromMemory = LineRouteSchedules.SelectMany(rs => rs.Value).Where(rs => rs.Table.Rows.Any(r => r.StopPoint.StopArea.Id == idToFind)).ToList();
 
             List<Table> tables = new List<Table>();
             List<List<StopPoint>> listStopPoints = new List<List<StopPoint>>();
@@ -199,16 +268,16 @@ namespace SncfOpenData
 
         public Dictionary<string, HashSet<StopPoint>> GetAllStopPointsForLinesStoppingAtStopArea(string idToFind)
         {
-            var saQuery = DataPack.StopAreas.Where(obj => obj.Id == idToFind).ToList();
+            var saQuery = StopAreas.Where(obj => obj.Id == idToFind).ToList();
             Debug.Assert(saQuery.Any(), "No stop area with this Id !");
 
-            //var routeSchedulesQueryFromMemory = DataPack.LineRouteSchedules.SelectMany(rs => rs.Value).Where(rs => rs.Table.Rows.Any(r => r.StopPoint.StopArea.Id == idToFind)).ToList();
+            //var routeSchedulesQueryFromMemory = LineRouteSchedules.SelectMany(rs => rs.Value).Where(rs => rs.Table.Rows.Any(r => r.StopPoint.StopArea.Id == idToFind)).ToList();
 
             Dictionary<string, HashSet<StopPoint>> v_ret = new Dictionary<string, HashSet<StopPoint>>();
             List<Table> tables = new List<Table>();
             List<List<StopPoint>> listStopPoints = new List<List<StopPoint>>();
             HashSet<StopPoint> stopPoints = new HashSet<StopPoint>();
-            foreach (KeyValuePair<string, List<RouteSchedule>> routeSchedulesByLineId in DataPack.LineRouteSchedules)
+            foreach (KeyValuePair<string, List<RouteSchedule>> routeSchedulesByLineId in LineRouteSchedules)
             {
                 foreach (RouteSchedule routeSchedule in routeSchedulesByLineId.Value)
                 {

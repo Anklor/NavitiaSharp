@@ -42,8 +42,8 @@ namespace SncfOpenData
 
             Dictionary<int, Troncon> allTroncons = _ignRepo.GetAllTroncons_Lambert93();
             Dictionary<int, Noeud> allNoeuds = _ignRepo.GetAllNoeuds_Lambert93()
-                                                            .Where(n=>n.Value.Nature == "Gare de voyageurs" || n.Value.Nature == "Gare de voyageurs et de fret")
-                                                            .ToDictionary(k=>k.Key,k=>k.Value);
+                                                            .Where(n => n.Value.Nature == "Gare de voyageurs" || n.Value.Nature == "Gare de voyageurs et de fret")
+                                                            .ToDictionary(k => k.Key, k => k.Value);
 
             #endregion
 
@@ -51,7 +51,7 @@ namespace SncfOpenData
             #region 1st pass : match within 100 meters (CPU intensive)
 
             List<StopAreaIGN> stopAreasIgn = new List<StopAreaIGN>();
-            Parallel.ForEach(_sncfRepo.DataPack.StopAreas, area =>
+            Parallel.ForEach(_sncfRepo.StopAreas, area =>
             {
                 StopAreaIGN areaIgn = new StopAreaIGN { StopAreaId = area.Id };
                 var area2154 = FromCoordToGeometry2154(area.Coord);
@@ -100,7 +100,7 @@ namespace SncfOpenData
                 Parallel.ForEach(stopAreasIgn_NonMatched, stopAreaIgn =>
                 //foreach (var stopAreaIgn in stopAreasIgn_NonMatched)
                 {
-                    StopArea area = _sncfRepo.DataPack.StopAreas.Where(s => s.Id == stopAreaIgn.StopAreaId).Single();
+                    StopArea area = _sncfRepo.StopAreas.Where(s => s.Id == stopAreaIgn.StopAreaId).Single();
 
                     var area2154 = FromCoordToGeometry2154(area.Coord);
 
@@ -123,7 +123,7 @@ namespace SncfOpenData
                         else
                         {
                             Debug.Fail($"WARN : {area.Name} name does not match with point {res.IGNObject.Toponyme} name. Distance : {(int)Math.Round(res.Distance, 0)}", "");
-                           
+
                         }
                     }
                     else
@@ -143,16 +143,40 @@ namespace SncfOpenData
         /// <summary>
         /// 
         /// </summary>
-        public void MatchLinesWithTronconsIGN()
+        public void MatchRoutesWithTronconsIGN()
         {
-            foreach(Line line in _sncfRepo.DataPack.Lines)
+            //foreach(Line line in _sncfRepo.Lines)
+            //{
+            //    HashSet<string> linkedRoutesId = new HashSet<string>(line.Routes.Select(lr => lr.Id));
+            //    List<StopArea> stopareas = null;
+            //    List<Route> routes = _sncfRepo.Routes.Where(r => linkedRoutesId.Contains(r.Id)).ToList();
+            //    if (_sncfRepo.LinesStopAreas.TryGetValue(line.Id, out stopareas))
+            //    {
+            //        List<int> ignNodes = stopareas.Select(sa => _sncfRepo.IgnNodeByStopArea[sa.Id]).ToList();
+            //        // TODO : Dijkstra for all troncons within envelope of all line stop areas
+            //    }
+            //}
+
+            var nodes = _ignRepo.GetAllNoeuds_Lambert93();
+            var troncons = _ignRepo.GetAllTroncons_Lambert93();
+
+            foreach (Route route in _sncfRepo.Routes)
             {
-                HashSet<string> linkedRoutesId = new HashSet<string>(line.Routes.Select(lr => lr.Id));
                 List<StopArea> stopareas = null;
-                List<Route> routes = _sncfRepo.DataPack.Routes.Where(r => linkedRoutesId.Contains(r.Id)).ToList();
-                if (_sncfRepo.DataPack.LinesStopAreas.TryGetValue(line.Id, out stopareas))
+                if (_sncfRepo.RoutesStopAreas.TryGetValue(route.Id, out stopareas))
                 {
-                    List<int> ignNodes = stopareas.Select(sa => _sncfRepo.DataPack.IgnNodeByStopArea[sa.Id]).ToList();
+                    HashSet<int> ignNodes = new HashSet<int>(stopareas.Select(sa => _sncfRepo.IgnNodeByStopArea[sa.Id]));
+                    var nodesIds = String.Join<int>(",", ignNodes);
+
+                    SqlGeometry geom = SqlTypesExtensions.PointEmpty_SqlGeometry(2154);
+
+                    foreach (var pointGeom in nodes.Where(kvp => ignNodes.Contains(kvp.Key)).Select(kvp => kvp.Value))
+                    {
+                        geom = geom.STUnion(pointGeom.Geometry);
+                    }
+                    geom = geom.STEnvelope();
+                    var tronconsInRoute = troncons.Where(kvp => kvp.Value.Geometry.STIntersects(geom).Value == true).ToList();
+
                     // TODO : Dijkstra for all troncons within envelope of all line stop areas
                 }
             }
@@ -166,7 +190,7 @@ namespace SncfOpenData
 
 
             Dictionary<string, SqlGeography> geogListStopAreas = new Dictionary<string, SqlGeography>();
-            IEnumerable<StopArea> stopAreas = _sncfRepo.DataPack.StopAreas;
+            IEnumerable<StopArea> stopAreas = _sncfRepo.StopAreas;
             if (polyQuery != null)
             {
                 stopAreas = stopAreas.Where(s => FromCoordToGeography(s.Coord).STIntersects(polyQuery).IsTrue);
@@ -176,7 +200,7 @@ namespace SncfOpenData
                 geogListStopAreas.Add(sp.Name + " " + sp.Id, FromCoordToGeography(sp.Coord));
             }
             Dictionary<string, SqlGeography> geogListStopPoints = new Dictionary<string, SqlGeography>();
-            IEnumerable<StopPoint> stopPoints = _sncfRepo.DataPack.StopPoints;
+            IEnumerable<StopPoint> stopPoints = _sncfRepo.StopPoints;
             if (polyQuery != null)
             {
                 stopPoints = stopPoints.Where(s => FromCoordToGeography(s.Coord).STIntersects(polyQuery).IsTrue);

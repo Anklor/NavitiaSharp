@@ -18,7 +18,7 @@ namespace SncfOpenData
             SncfRepository repo = new SncfRepository(DATA_DIR_SNCF, 1000);
             CoreService core = new CoreService(repo, ignService);
 
-            core.MatchLinesWithTronconsIGN();
+            core.MatchRoutesWithTronconsIGN();
 
             //select N.ID_RTE500 As ID_NOEUD
             //  ,T.ID_RTE500 as ID_TRONCON
@@ -37,8 +37,8 @@ namespace SncfOpenData
             //repo.SaveStaticData();
             // Line line = sncfApi.GetLine("line:OCE:SN-87276055-87276139");
 
-            //repo.GetAndSavedRelatedData<Line, StopArea>(repo.Api, repo.DataPack.Lines, "lines/{id}/stop_areas", DATA_DIR_SNCF, "lines.stop_areas.json");
-            //repo.GetAndSavedRelatedData<Route, StopArea>(repo.Api, repo.DataPack.Routes, "routes/{id}/stop_areas", DATA_DIR_SNCF, "routes.stop_areas.json");
+            //repo.GetAndSavedRelatedData<Line, StopArea>(repo.Api, repo.Lines, "lines/{id}/stop_areas", DATA_DIR_SNCF, "lines.stop_areas.json");
+            //repo.GetAndSavedRelatedData<Route, StopArea>(repo.Api, repo.Routes, "routes/{id}/stop_areas", DATA_DIR_SNCF, "routes.stop_areas.json");
 
             // TODO : get all route stop areas
             // we can then map to geo network with a little Dijkstra for each route
