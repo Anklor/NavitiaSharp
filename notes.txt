@@ -1,0 +1,81 @@
+Paris / Marseille TGV:
+line:OCE:SN-87751008-87686006
+route:OCE:SN-TGV-87686006-87751008
+
+
+Ligne Marseille/Aix/Perthuis
+line:OCE:340
+
+Aix TGV :
+stop_area:OCE:SA:87319012
+stop_point:OCE:SP:TGV-87319012
+
+Meyrargues :
+stop_area:OCE:SA:87751370
+stop_point:OCE:SP:TrainTER-87751370
+
+Marseille St Charles:
+stop_area:OCE:SA:87751008
+stop_point:OCE:SP:CorailIntercité-87751008
+stop_point:OCE:SP:TGV-87751008
+stop_point:OCE:SP:TrainTER-87751008
+
+
+Marseille -> Paris not stopping at Aix
+Lundi 30/01 Durée 03h07 Départ à : 08h38 DE LA GARE DE : MARSEILLE SAINT CHARLES TRANSPORTEUR : TGV Numéro du train :6108
+Arrivée à : 11h45 A la gare de : PARIS GARE DE LYON
+
+Marseille -> Paris not stopping at Aix
+Lundi 30/01 Durée 03h07 Départ à : 08h38 DE LA GARE DE : MARSEILLE SAINT CHARLES TRANSPORTEUR : TGV Numéro du train :6108
+Arrivée à : 11h45 A la gare de : PARIS GARE DE LYON
+
+declare @g geography = 'POLYGON((5.2734375 43.259580971072275,5.41351318359375 43.1614915129406,5.4986572265625 43.295574211963746,5.5810546875 43.42936191764414,5.90789794921875 43.57678451504994,5.877685546875 43.74766111392921,5.88043212890625 43.86064850339098,5.62225341796875 43.75559702541283,5.4327392578125 43.670230832122314,5.27069091796875 43.58474304793296,5.23773193359375 43.431356514362626,5.2734375 43.259580971072275))'
+
+
+
+------------------------------------------
+
+select	T.ID_RTE500 as ID_TRONCON
+		, N.ID_RTE500 AS ID_NOEUD
+from dbo.TRONCON_VOIE_FERREE_2154 T
+left join dbo.NOEUD_FERRE_2154 N
+ON T.geom2154.STIntersects(N.geom2154) =1
+ORDER BY T.ID_RTE500
+
+select	N.ID_RTE500 AS ID_NOEUD
+		, T.ID_RTE500 as ID_TRONCON
+from dbo.NOEUD_FERRE_2154 N
+left join dbo.TRONCON_VOIE_FERREE_2154 T
+ON N.geom2154.STIntersects(T.geom2154) =1
+ORDER BY N.ID_RTE500
+
+
+select	N.ID_RTE500 AS ID_NOEUD
+		, T.ID_RTE500 as ID_TRONCON
+		, T.geom2154
+from dbo.NOEUD_FERRE_2154 N
+left join dbo.TRONCON_VOIE_FERREE_2154 T
+ON N.geom2154.STIntersects(T.geom2154) =1
+where N.ID_RTE500 
+in(4101
+	,2040
+	,2927
+	,4102
+	,1857
+	,4172
+	,1866
+	,2917
+	,2196)
+
+----------------------------------------
+
+declare @t geometry
+select @t = geom2154 from dbo.TRONCON_VOIE_FERREE_2154 where ID_RTE500 = 5621
+
+select * from  dbo.TRONCON_VOIE_FERREE_2154 where geom2154.STDistance(@t) < 2000
+
+select @t.STBuffer(200)
+union all
+select geom2154 from  dbo.TRONCON_VOIE_FERREE_2154 where geom2154.STDistance(@t) < 2000
+union all
+select geom2154.STBuffer(50) from  dbo.NOEUD_FERRE_2154 where geom2154.STDistance(@t) < 2000

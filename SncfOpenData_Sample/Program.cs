@@ -18,6 +18,7 @@ namespace SncfOpenData
             SncfRepository repo = new SncfRepository(DATA_DIR_SNCF, 1000);
             CoreService core = new CoreService(repo, ignService);
 
+            core.MatchLinesWithTronconsIGN();
 
             //select N.ID_RTE500 As ID_NOEUD
             //  ,T.ID_RTE500 as ID_TRONCON

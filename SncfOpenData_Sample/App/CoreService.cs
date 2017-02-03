@@ -26,7 +26,14 @@ namespace SncfOpenData
             _ignRepo = railroads;
         }
 
-        public List<StopAreaIGN> MatchStopAreasWithIGNNodes(List<StopAreaIGN> stopAreasIgn = null)
+        /// <summary>
+        /// Find nearest IGN nodes for each Sncf stop area.
+        /// Done recursively in two passes. One for close matches within 100 m
+        /// Second pass with 30km and name checking (breaks in debug for name mismatches)
+        /// </summary>
+        /// <param name="stopAreasIgn">Pass</param>
+        /// <returns></returns>
+        public List<StopAreaIGN> MatchStopAreasWithIGNNodes()
         {
             // Work in L93 proj : use of more funcs on geometry types, and distance calculations done in meters
 
@@ -34,56 +41,64 @@ namespace SncfOpenData
             #region Full DB read
 
             Dictionary<int, Troncon> allTroncons = _ignRepo.GetAllTroncons_Lambert93();
-            Dictionary<int, Noeud> allNoeuds = _ignRepo.GetAllNoeuds_Lambert93();
+            Dictionary<int, Noeud> allNoeuds = _ignRepo.GetAllNoeuds_Lambert93()
+                                                            .Where(n=>n.Value.Nature == "Gare de voyageurs" || n.Value.Nature == "Gare de voyageurs et de fret")
+                                                            .ToDictionary(k=>k.Key,k=>k.Value);
 
             #endregion
 
-            if (stopAreasIgn == null)
+
+            #region 1st pass : match within 100 meters (CPU intensive)
+
+            List<StopAreaIGN> stopAreasIgn = new List<StopAreaIGN>();
+            Parallel.ForEach(_sncfRepo.DataPack.StopAreas, area =>
             {
-                #region 1st pass : match within 500 meters (CPU intensive)
+                StopAreaIGN areaIgn = new StopAreaIGN { StopAreaId = area.Id };
+                var area2154 = FromCoordToGeometry2154(area.Coord);
+                var closestIgnPoints = from noeud in allNoeuds
+                                       let dist = noeud.Value.Geometry.STDistance(area2154).Value
+                                       where dist < 100
+                                       orderby dist
+                                       select new { Distance = dist, StopArea = area, CoordL93 = area2154, IGNObject = noeud.Value };
 
-                stopAreasIgn = new List<StopAreaIGN>();
-                Parallel.ForEach(_sncfRepo.DataPack.StopAreas, area =>
+                var res = closestIgnPoints.FirstOrDefault();
+                if (res != null)
                 {
-                    StopAreaIGN areaIgn = new StopAreaIGN { StopAreaId = area.Id };
-                    var area2154 = FromCoordToGeometry2154(area.Coord);
-                    var closestIgnPoints = from noeud in allNoeuds
-                                           let dist = noeud.Value.Geometry.STDistance(area2154).Value
-                                           where dist < 100
-                                           orderby dist
-                                           select new { Distance = dist, StopArea = area, CoordL93 = area2154, IGNObject = noeud.Value };
 
-                    var res = closestIgnPoints.FirstOrDefault();
-                    if (res != null)
-                    {
-
-                        Trace.TraceInformation($"{area.Name}: point {res.IGNObject.Toponyme} at {(int)Math.Round(res.Distance, 0)}");
-                        areaIgn.IdNoeud = res.IGNObject.Id;
-                        areaIgn.NomNoeud = res.IGNObject.Toponyme;
-                        areaIgn.DistanceNoeud = res.Distance;
-
-                    }
-                    else
-                    {
-                        Trace.TraceInformation($"{area.Name}: not point found.");
-                    }
-                    stopAreasIgn.Add(areaIgn);
+                    Trace.TraceInformation($"{area.Name}: point {res.IGNObject.Toponyme} at {(int)Math.Round(res.Distance, 0)}");
+                    areaIgn.IdNoeud = res.IGNObject.Id;
+                    areaIgn.NomNoeud = res.IGNObject.Toponyme;
+                    areaIgn.DistanceNoeud = res.Distance;
 
                 }
-                );
-
-                return MatchStopAreasWithIGNNodes(stopAreasIgn);
-
-                #endregion
+                else
+                {
+                    Trace.TraceInformation($"{area.Name}: not point found.");
+                }
+                stopAreasIgn.Add(areaIgn);
 
             }
-            else
+            );
+
+            // 2nd pass
+            return MatchStopAreasWithIGNNodes_2ndPass(stopAreasIgn, allTroncons, allNoeuds);
+
+            #endregion
+
+        }
+
+        private List<StopAreaIGN> MatchStopAreasWithIGNNodes_2ndPass(List<StopAreaIGN> stopAreasIgn, Dictionary<int, Troncon> allTroncons, Dictionary<int, Noeud> allNoeuds)
+        {
+            // Work in L93 proj : use of more funcs on geometry types, and distance calculations done in meters
+
+            if (stopAreasIgn != null)
             {
+
                 #region 2nd pass : for non matched, match within 30000 meters (CPU intensive)
 
                 var stopAreasIgn_NonMatched = stopAreasIgn.Where(s => s.HasIGNMatch == false);
-                //Parallel.ForEach(repo.DataPack.StopAreas, area =>
-                foreach (var stopAreaIgn in stopAreasIgn_NonMatched)
+                Parallel.ForEach(stopAreasIgn_NonMatched, stopAreaIgn =>
+                //foreach (var stopAreaIgn in stopAreasIgn_NonMatched)
                 {
                     StopArea area = _sncfRepo.DataPack.StopAreas.Where(s => s.Id == stopAreaIgn.StopAreaId).Single();
 
@@ -107,8 +122,8 @@ namespace SncfOpenData
                         }
                         else
                         {
-                            Trace.TraceWarning($"WARN : {area.Name} does not match with point {res.IGNObject.Toponyme}. Distance : {(int)Math.Round(res.Distance, 0)}");
-
+                            Debug.Fail($"WARN : {area.Name} name does not match with point {res.IGNObject.Toponyme} name. Distance : {(int)Math.Round(res.Distance, 0)}", "");
+                           
                         }
                     }
                     else
@@ -117,7 +132,7 @@ namespace SncfOpenData
                     }
 
                 }
-                //);
+                );
 
                 #endregion
             }
@@ -125,9 +140,22 @@ namespace SncfOpenData
             return stopAreasIgn;
         }
 
-        public void MatchLinesWithGeom()
+        /// <summary>
+        /// 
+        /// </summary>
+        public void MatchLinesWithTronconsIGN()
         {
-           
+            foreach(Line line in _sncfRepo.DataPack.Lines)
+            {
+                HashSet<string> linkedRoutesId = new HashSet<string>(line.Routes.Select(lr => lr.Id));
+                List<StopArea> stopareas = null;
+                List<Route> routes = _sncfRepo.DataPack.Routes.Where(r => linkedRoutesId.Contains(r.Id)).ToList();
+                if (_sncfRepo.DataPack.LinesStopAreas.TryGetValue(line.Id, out stopareas))
+                {
+                    List<int> ignNodes = stopareas.Select(sa => _sncfRepo.DataPack.IgnNodeByStopArea[sa.Id]).ToList();
+                    // TODO : Dijkstra for all troncons within envelope of all line stop areas
+                }
+            }
         }
 
         public void ShowStopAreasOnMap(SncfRepository _sncfRepo, IGNRepository _ignRepo, string wkt = null)
@@ -200,6 +228,7 @@ namespace SncfOpenData
             SpatialTrace.Disable();
         }
 
+        #region Conversion helpers
 
         private SqlGeography FromCoordToGeography(Coord coord)
         {
@@ -213,5 +242,7 @@ namespace SncfOpenData
         {
             return FromCoordToGeometry(coord).ReprojectTo(2154);
         }
+
+        #endregion
     }
 }
