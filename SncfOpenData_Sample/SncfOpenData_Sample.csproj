@@ -66,6 +66,10 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="App\CoreService.cs" />
+    <Compile Include="GraphCollection\Dijkstra.cs" />
+    <Compile Include="GraphCollection\GraphNode.cs" />
+    <Compile Include="GraphCollection\IQueue.cs" />
+    <Compile Include="GraphCollection\PriorityQueue.cs" />
     <Compile Include="IGN\Model\Noeud.cs" />
     <Compile Include="IGN\Model\Projection.cs" />
     <Compile Include="IGN\Model\Troncon.cs" />
@@ -113,6 +117,7 @@
     <Content Include="..\packages\SqlServerSpatial.Toolkit.1.0.1\toolkit\SqlServerSpatial.Toolkit.Viewer.exe">
       <Link>SqlServerSpatial.Toolkit\SqlServerSpatial.Toolkit.Viewer.exe</Link>
     </Content>
+    <Content Include="GraphCollection\readme.txt" />
     <Content Include="SqlServerSpatial.Toolkit\readme.htm" />
     <Content Include="SqlServerTypes\readme.htm" />
   </ItemGroup>

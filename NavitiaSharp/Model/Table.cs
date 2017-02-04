@@ -46,11 +46,18 @@ namespace NavitiaSharp
         [DeserializeAs(Name = "rows")]
         public List<Row> Rows { get; set; }
 
+        public bool WithSchedule
+        {
+            get
+            {
+                return Rows.Any(r => r.DateTimes.Any(dt => dt.DateTime != default(DateTime)));
+            }
+        }
+
         public override string ToString()
         {
             string ret =  $"{Rows.Count} row(s)";
-            bool withSchedule = Rows.Any(r => r.DateTimes.Any(dt => dt.DateTime != default(DateTime)));
-            if (withSchedule)
+            if (WithSchedule)
             { 
                 ret += " with schedules.";
             }

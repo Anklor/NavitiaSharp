@@ -126,7 +126,7 @@ namespace SncfOpenData
                         _stopAreaByIgnNode[kvp.Value].Add(kvp.Key);
                     }
                 }
-                
+
                 return _stopAreaByIgnNode;
             }
             internal set { _stopAreaByIgnNode = value; }
@@ -147,7 +147,7 @@ namespace SncfOpenData
             _api = new SncfApi(sncfAuthKey);
         }
 
-        
+
         public List<T> LoadSavedDataList<T>(string fileName)
         {
             string fullFileName = Path.Combine(_dataDirectory, fileName);
@@ -196,12 +196,50 @@ namespace SncfOpenData
                 }
                 else
                 {
-                    // load from disk
-                    string fullFileName = Path.Combine(LINE_ROUTE_SCHEDULES_DIR, line.Id.Replace(":", ".") + ".json");
-                    allItems = LoadSavedDataList<RouteSchedule>(fullFileName);
+                    if (this.LineRouteSchedules.ContainsKey(line.Id))
+                    {
+                        return this.LineRouteSchedules[line.Id];
+                    }
+                    else
+                    {
+                        return new List<RouteSchedule>();
+                    }
                 }
             }
             return allItems;
+        }
+        public RouteSchedule GetRouteSchedule(Route route, bool fromApi = false)
+        {
+            List<RouteSchedule> routeSchedules = routeSchedules = GetLineRouteSchedules(route.Line, fromApi);
+
+            if (routeSchedules != null)
+            {
+                RouteSchedule rs = GetRouteScheduleForRoute(routeSchedules, route);
+                return rs;
+            }
+            return null;
+        }
+        public RouteSchedule GetRouteScheduleForRoute(List<RouteSchedule> lineSchedules, Route route)
+        {
+            var routeSchedules = (from schedule in lineSchedules
+                                           where route.Id == GetRouteIdFromSchedule(schedule) && schedule.DisplayInformations.Direction == route.Direction.StopArea.Label
+                                           select schedule).ToList();
+
+            Debug.Assert(routeSchedules.Count > 0, "No route schedules. Check destination match with stop area label !");
+            Debug.Assert(routeSchedules.Count == 1, "Multiple route schedules !");
+            return routeSchedules.First();
+        }
+        public string GetRouteIdFromSchedule(RouteSchedule schedule)
+        {
+            Link routeLink = schedule.Links.Where(link => link.Type == "route").FirstOrDefault();
+            if (routeLink == null)
+            {
+                return null;
+            }
+            else
+            {
+                return routeLink.Id;
+            }
         }
 
         private void SaveLineRouteSchedules(SncfApi sncfApi, List<Line> lines, string dataDir, int chunkSize = DEFAULT_CHUNK_SIZE)
@@ -368,7 +406,7 @@ namespace SncfOpenData
                                                                                             List<TBase> baseResourceList,
                                                                                             string patternPathToRelatedResource,
                                                                                             string dataDirectory,
-                                                                                            string outputFileName) where TBase : IApiResource, new()
+                                                                                            string outputFileName) where TBase : ApiResourceBase, new()
                                                                                                                    where TRelated : new()
         {
             //Dictionary<string, List<TRelated>> dic = new Dictionary<string, List<TRelated>>();

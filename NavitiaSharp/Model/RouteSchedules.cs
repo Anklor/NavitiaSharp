@@ -24,6 +24,14 @@ namespace NavitiaSharp
         [DeserializeAs(Name = "geojson")]
         public Geojson Geojson { get; set; }
 
+        public bool WithSchedule
+        {
+            get
+            {
+                return Table.WithSchedule;
+            }
+        }
+
         public override string ToString()
         {
             return $"{DisplayInformations}";

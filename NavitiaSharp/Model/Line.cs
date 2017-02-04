@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace NavitiaSharp
 {
-    public class Line : IEquatable<Line>, IApiResource
+    public class Line : ApiResourceBase
     {
         [DeserializeAs(Name = "code")]
         public string Code { get; set; }
@@ -41,10 +41,7 @@ namespace NavitiaSharp
 
         [DeserializeAs(Name = "commercial_mode")]
         public CommercialMode CommercialMode { get; set; }
-
-        [DeserializeAs(Name = "id")]
-        public string Id { get; set; }
-
+        
         [DeserializeAs(Name = "network")]
         public Network Network { get; set; }
 
@@ -52,24 +49,7 @@ namespace NavitiaSharp
         {
             return Name;
         }
-        public bool Equals(Line other)
-        {
-            return this.Id == other.Id;
-        }
-
-        public override bool Equals(object obj)
-        {
-            if (obj is Line)
-            {
-                return Equals((Line)obj);
-            }
-            return false;
-        }
-
-        public override int GetHashCode()
-        {
-            return Id.GetHashCode();
-        }
+       
     }
 
 

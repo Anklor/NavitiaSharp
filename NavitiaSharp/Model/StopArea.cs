@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace NavitiaSharp
 {
-    public class StopArea
+    public class StopArea : ApiResourceBase
     {
 
         [DeserializeAs(Name = "codes")]
@@ -26,9 +26,6 @@ namespace NavitiaSharp
 
         [DeserializeAs(Name = "timezone")]
         public string Timezone { get; set; }
-
-        [DeserializeAs(Name = "id")]
-        public string Id { get; set; }
 
         public override string ToString()
         {

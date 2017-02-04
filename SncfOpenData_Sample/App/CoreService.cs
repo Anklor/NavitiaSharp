@@ -1,4 +1,5 @@
 ﻿using Microsoft.SqlServer.Types;
+using GraphCollection;
 using NavitiaSharp;
 using SncfOpenData.IGN;
 using SncfOpenData.IGN.Model;
@@ -162,24 +163,115 @@ namespace SncfOpenData
 
             foreach (Route route in _sncfRepo.Routes)
             {
+                // How to get proper order for stop areas ?
+                // Let's look at route schedules
+                RouteSchedule schedule = _sncfRepo.GetRouteSchedule(route, false);
+
                 List<StopArea> stopareas = null;
-                if (_sncfRepo.RoutesStopAreas.TryGetValue(route.Id, out stopareas))
+                _sncfRepo.RoutesStopAreas.TryGetValue(route.Id, out stopareas);
+                if (stopareas != null)
                 {
-                    HashSet<int> ignNodes = new HashSet<int>(stopareas.Select(sa => _sncfRepo.IgnNodeByStopArea[sa.Id]));
-                    var nodesIds = String.Join<int>(",", ignNodes);
-
-                    SqlGeometry geom = SqlTypesExtensions.PointEmpty_SqlGeometry(2154);
-
-                    foreach (var pointGeom in nodes.Where(kvp => ignNodes.Contains(kvp.Key)).Select(kvp => kvp.Value))
+                    if (schedule != null)
                     {
-                        geom = geom.STUnion(pointGeom.Geometry);
+                        stopareas = FilterAndSortStopAreas(stopareas, schedule);
                     }
-                    geom = geom.STEnvelope();
-                    var tronconsInRoute = troncons.Where(kvp => kvp.Value.Geometry.STIntersects(geom).Value == true).ToList();
+
+                    HashSet<int> ignNodes = GetStopAreaIgnNodes(stopareas);
+                    var nodesIds = "(" + String.Join<int>("),(", ignNodes) + ")"; // insert clause
+
+                    SqlGeometry geom = GetNodesGeometryAggregate(FilterNodes(nodes, ignNodes));
+                    // less volume but some troncons may be lost. If so, try with STEnvelope()
+                    geom = geom.STConvexHull();
+
+                    var tronconsInRoute = FilterTroncons(troncons, geom).ToList();
+                    var nodesInRoute = FilterNodes(nodes, geom).ToList();
+
+                    // Generate topology
+                    var topologyByTroncon = GetTopologyByTroncon(tronconsInRoute, nodesInRoute);
+                    var topologyByNode = GetTopologyByNode(tronconsInRoute, nodesInRoute);
 
                     // TODO : Dijkstra for all troncons within envelope of all line stop areas
+                    FindPath(topologyByTroncon, topologyByNode, tronconsInRoute.ToDictionary(t => t.Id, t => t), ignNodes.First(), ignNodes.Last());
                 }
             }
+        }
+
+
+
+        private void FindPath(Dictionary<int, HashSet<int>> nodesByTroncon, Dictionary<int, HashSet<int>> tronconsByNode, Dictionary<int, Troncon> troncons, int ignNodeStartId, int ignNodeEndId)
+        {
+            Dictionary<int, GraphNode<int>> graphNodes = tronconsByNode.Select(kvp => kvp.Key).ToDictionary(k => k, k => new GraphNode<int>(k));
+
+            foreach (var tronconNodes in nodesByTroncon)
+            {
+                if (tronconNodes.Value != null && tronconNodes.Value.Count > 1)
+                {
+                    GraphNode<int> gNode = graphNodes[tronconNodes.Value.First()];
+                    gNode.AddNeighbour(graphNodes[tronconNodes.Value.Last()], 1);
+                }
+            }
+            //foreach (var nodeTroncons in tronconsByNode)
+            //{
+            //    GraphNode<int> gNode = graphNodes[nodeTroncons.Key];
+            //    visited.Add(nodeTroncons.Key);
+
+            //    foreach (var idTroncon in nodeTroncons.Value)
+            //    {
+            //        foreach (int idNode in nodesByTroncon[idTroncon])
+            //        {
+            //            gNode.AddNeighbour(graphNodes[idNode], (int)troncons[idTroncon].Geometry.STLength().Value);
+            //        }
+
+            //    }
+            //}
+
+            var dijkstra = new Dijkstra<int>(graphNodes.Values);
+            var path = dijkstra.FindShortestPathBetween(graphNodes[ignNodeStartId], graphNodes[ignNodeEndId]);
+        }
+
+        private Dictionary<int, HashSet<int>> GetTopologyByTroncon(List<Troncon> tronconsInRoute, List<Noeud> nodesInRoute)
+        {
+            var query = from troncon in tronconsInRoute
+                        let connectedNodes = nodesInRoute.Where(n => n.Geometry.STIntersects(troncon.Geometry).IsTrue)
+                        select new { IdTroncon = troncon.Id, Nodes = connectedNodes.Select(n => n.Id) };
+            return query.ToDictionary(a => a.IdTroncon, a => new HashSet<int>(a.Nodes));
+        }
+        private Dictionary<int, HashSet<int>> GetTopologyByNode(List<Troncon> tronconsInRoute, List<Noeud> nodesInRoute)
+        {
+            var query = from node in nodesInRoute
+                        let connectedTroncons = tronconsInRoute.Where(n => n.Geometry.STIntersects(node.Geometry).IsTrue)
+                        select new { IdNode = node.Id, Troncons = connectedTroncons.Select(n => n.Id) };
+            return query.ToDictionary(a => a.IdNode, a => new HashSet<int>(a.Troncons));
+        }
+
+        private HashSet<int> GetStopAreaIgnNodes(List<StopArea> stopareas)
+        {
+            return new HashSet<int>(stopareas.Select(sa => _sncfRepo.IgnNodeByStopArea[sa.Id]));
+        }
+
+        private IEnumerable<Noeud> FilterNodes(Dictionary<int, Noeud> nodes, HashSet<int> keys)
+        {
+            return nodes.Where(kvp => keys.Contains(kvp.Key)).Select(kvp => kvp.Value);
+        }
+        private IEnumerable<Noeud> FilterNodes(Dictionary<int, Noeud> nodes, SqlGeometry geomFilter)
+        {
+            return nodes.Where(kvp => kvp.Value.Geometry.STIntersects(geomFilter).Value == true)
+                            .Select(t => t.Value);
+        }
+        private IEnumerable<Troncon> FilterTroncons(Dictionary<int, Troncon> troncons, SqlGeometry geomFilter)
+        {
+            return troncons.Where(kvp => kvp.Value.Geometry.STIntersects(geomFilter).Value == true)
+                            .Select(t => t.Value);
+        }
+
+        private SqlGeometry GetNodesGeometryAggregate(IEnumerable<Noeud> nodes)
+        {
+            SqlGeometry geom = SqlTypesExtensions.PointEmpty_SqlGeometry(2154);
+            foreach (var pointGeom in nodes)
+            {
+                geom = geom.STUnion(pointGeom.Geometry);
+            }
+            return geom;
         }
 
         public void ShowStopAreasOnMap(SncfRepository _sncfRepo, IGNRepository _ignRepo, string wkt = null)
@@ -265,6 +357,26 @@ namespace SncfOpenData
         private SqlGeometry FromCoordToGeometry2154(Coord coord)
         {
             return FromCoordToGeometry(coord).ReprojectTo(2154);
+        }
+
+
+        #endregion
+
+        #region Sort helpers
+
+        private List<StopArea> FilterAndSortStopAreas(List<StopArea> stopareas, RouteSchedule routeSchedule)
+        {
+            Dictionary<StopArea, DateTime> firstSchedule = routeSchedule.Table.Rows.Select(r => new { StopArea = r.StopPoint.StopArea, DateTime = r.DateTimes.First() })
+                                                                                       .Where(a => a.DateTime.DateTime != default(DateTime))
+                                                                                       .OrderBy(a => a.DateTime.DateTime)
+                                                                                       .ToDictionary(a => a.StopArea, a => a.DateTime.DateTime);
+
+            List<StopArea> result = (from sa in stopareas
+                                     join s in firstSchedule on sa equals s.Key
+                                     orderby s.Value
+                                     select sa).ToList();
+            return result;
+
         }
 
         #endregion

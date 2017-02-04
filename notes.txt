@@ -50,24 +50,55 @@ ON N.geom2154.STIntersects(T.geom2154) =1
 ORDER BY N.ID_RTE500
 
 
-declare @env geometry
-select @env = geometry::EnvelopeAggregate(geom2154) from NOEUD_FERRE_2154
-where ID_RTE500 in(1832,4065,1535,1843,3776,2396,2231,2870,1842,4344,2492,4064)
+-------------------------------------------------
 
-	select	N.ID_RTE500 AS ID_NOEUD
+declare @ids table (id int);
+insert into @ids (id) values (1832),(1535),(4065),(2396),(1843),(2492),(4344),(2870),(163)
+
+
+declare @startId int = 1832
+declare @endId int = 163
+
+declare @env geometry
+select @env = geometry::UnionAggregate(geom2154) from NOEUD_FERRE_2154
+where ID_RTE500 in (select id from @ids)
+select @env = @env.STConvexHull()
+
+
+-- All nodes
+select	N.ID_RTE500 AS ID_NOEUD
 	, N.geom2154.STBuffer(200)
+	, 'Node' + cast(ID_RTE500 as varchar(10)) as Label
 	from NOEUD_FERRE_2154 N
 	where N.geom2154.STIntersects(@env) = 1
-union all
+union all	
+-- All troncons
 	select	ID_RTE500 AS ID_TRONCON
 	,geom2154
+	, 'Troncon ' + cast(ID_RTE500 as varchar(10)) as Label
 	from TRONCON_VOIE_FERREE_2154
 	where geom2154.STIntersects(@env) = 1
 union all
+-- All stopareas
 	select	N.ID_RTE500 AS ID_NOEUD
 	, N.geom2154.STBuffer(1500)
+	, 'StopArea' as Label
 	from NOEUD_FERRE_2154 N
-	where N.ID_RTE500 in(1832,4065,1535,1843,3776,2396,2231,2870,1842,4344,2492,4064)
+	where N.ID_RTE500 in (select id from @ids)
+union all
+-- Start
+select	N.ID_RTE500 AS ID_NOEUD
+	, N.geom2154.STBuffer(3000)
+	, 'Start' as Label
+	from NOEUD_FERRE_2154 N
+	where N.ID_RTE500 = @startId
+	union all
+-- Stop
+select	N.ID_RTE500 AS ID_NOEUD
+	, N.geom2154.STBuffer(3000)
+	, 'Stop' as Label
+	from NOEUD_FERRE_2154 N
+	where N.ID_RTE500 = @endId
 
 
 ----------------------------------------

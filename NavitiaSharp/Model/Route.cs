@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace NavitiaSharp
 {
-    public class Route : IApiResource
+    public class Route : ApiResourceBase
     {
 
         [DeserializeAs(Name = "direction")]
@@ -23,10 +23,7 @@ namespace NavitiaSharp
 
         [DeserializeAs(Name = "direction_type")]
         public string DirectionType { get; set; }
-
-        [DeserializeAs(Name = "id")]
-        public string Id { get; set; }
-
+        
         [DeserializeAs(Name = "line")]
         public Line Line { get; set; }
 
