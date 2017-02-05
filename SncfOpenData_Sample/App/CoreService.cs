@@ -161,38 +161,46 @@ namespace SncfOpenData
             var nodes = _ignRepo.GetAllNoeuds_Lambert93();
             var troncons = _ignRepo.GetAllTroncons_Lambert93();
 
-            foreach (Route route in _sncfRepo.Routes)
+            IEnumerable<Route> routes = _sncfRepo.Routes;
+            // debug test route
+            routes = routes.Take(1);
+            routes = routes.Where(r => r.Id == "route:OCE:104647-TrainTER-87581009-87592006");
+
+            foreach (Route route in routes)
             {
                 // How to get proper order for stop areas ?
                 // Let's look at route schedules
                 RouteSchedule schedule = _sncfRepo.GetRouteSchedule(route, false);
-
-                List<StopArea> stopareas = null;
-                _sncfRepo.RoutesStopAreas.TryGetValue(route.Id, out stopareas);
-                if (stopareas != null)
+                if (schedule != null && schedule.Table.WithSchedule)
                 {
-                    if (schedule != null)
+                    List<StopArea> stopareas = null;
+                    _sncfRepo.RoutesStopAreas.TryGetValue(route.Id, out stopareas);
+                    if (stopareas != null)
                     {
-                        stopareas = FilterAndSortStopAreas(stopareas, schedule);
+                        if (schedule != null)
+                        {
+                            stopareas = FilterAndSortStopAreas(stopareas, schedule);
+                        }
+
+                        HashSet<int> ignNodes = GetStopAreaIgnNodes(stopareas);
+                        var nodesIds = "(" + String.Join<int>("),(", ignNodes) + ")"; // insert clause
+
+                        SqlGeometry geom = GetNodesGeometryAggregate(FilterNodes(nodes, ignNodes));
+                        geom = geom.STEnvelope().STBuffer(5000);
+
+                        var tronconsInRoute = FilterTroncons(troncons, geom).ToList();
+                        var nodesInRoute = FilterNodes(nodes, geom).ToList();
+
+                        // Generate topology
+                        var topologyByTroncon = GetTopologyByTroncon(tronconsInRoute, nodesInRoute);
+                        var topologyByNode = GetTopologyByNode(tronconsInRoute, nodesInRoute);
+
+                        // TODO : Dijkstra for all troncons within envelope of all line stop areas
+                        FindPath(topologyByTroncon, topologyByNode, tronconsInRoute.ToDictionary(t => t.Id, t => t), ignNodes.First(), ignNodes.Last());
                     }
-
-                    HashSet<int> ignNodes = GetStopAreaIgnNodes(stopareas);
-                    var nodesIds = "(" + String.Join<int>("),(", ignNodes) + ")"; // insert clause
-
-                    SqlGeometry geom = GetNodesGeometryAggregate(FilterNodes(nodes, ignNodes));
-                    // less volume but some troncons may be lost. If so, try with STEnvelope()
-                    geom = geom.STConvexHull();
-
-                    var tronconsInRoute = FilterTroncons(troncons, geom).ToList();
-                    var nodesInRoute = FilterNodes(nodes, geom).ToList();
-
-                    // Generate topology
-                    var topologyByTroncon = GetTopologyByTroncon(tronconsInRoute, nodesInRoute);
-                    var topologyByNode = GetTopologyByNode(tronconsInRoute, nodesInRoute);
-
-                    // TODO : Dijkstra for all troncons within envelope of all line stop areas
-                    FindPath(topologyByTroncon, topologyByNode, tronconsInRoute.ToDictionary(t => t.Id, t => t), ignNodes.First(), ignNodes.Last());
                 }
+
+               
             }
         }
 
@@ -206,8 +214,10 @@ namespace SncfOpenData
             {
                 if (tronconNodes.Value != null && tronconNodes.Value.Count > 1)
                 {
-                    GraphNode<int> gNode = graphNodes[tronconNodes.Value.First()];
-                    gNode.AddNeighbour(graphNodes[tronconNodes.Value.Last()], 1);
+                    GraphNode<int> gNodeStart = graphNodes[tronconNodes.Value.First()];
+                    GraphNode<int> gNodeEnd = graphNodes[tronconNodes.Value.Last()];
+                    gNodeStart.AddNeighbour(gNodeEnd, 1);
+                    gNodeEnd.AddNeighbour(gNodeStart, 1);
                 }
             }
             //foreach (var nodeTroncons in tronconsByNode)
@@ -225,8 +235,8 @@ namespace SncfOpenData
             //    }
             //}
 
-            var dijkstra = new Dijkstra<int>(graphNodes.Values);
-            var path = dijkstra.FindShortestPathBetween(graphNodes[ignNodeStartId], graphNodes[ignNodeEndId]);
+            //var dijkstra = new Dijkstra<int>(graphNodes.Values);
+            //var path = dijkstra.FindShortestPathBetween(graphNodes[ignNodeStartId], graphNodes[ignNodeEndId]);
         }
 
         private Dictionary<int, HashSet<int>> GetTopologyByTroncon(List<Troncon> tronconsInRoute, List<Noeud> nodesInRoute)
@@ -366,18 +376,48 @@ namespace SncfOpenData
 
         private List<StopArea> FilterAndSortStopAreas(List<StopArea> stopareas, RouteSchedule routeSchedule)
         {
-            Dictionary<StopArea, DateTime> firstSchedule = routeSchedule.Table.Rows.Select(r => new { StopArea = r.StopPoint.StopArea, DateTime = r.DateTimes.First() })
-                                                                                       .Where(a => a.DateTime.DateTime != default(DateTime))
-                                                                                       .OrderBy(a => a.DateTime.DateTime)
-                                                                                       .ToDictionary(a => a.StopArea, a => a.DateTime.DateTime);
+            List<StopArea> result = stopareas;
+            try
+            {
+                if (routeSchedule.Table.WithSchedule)
+                {
+                    // sort and filter using schedule dates
+                    Dictionary<StopArea, DateTime> firstSchedule = routeSchedule.Table.Rows.Select(r => new { StopArea = r.StopPoint.StopArea, DateTime = r.DateTimes.First() })
+                                                                                          .Where(a => a.DateTime.DateTime != default(DateTime))
+                                                                                          .OrderBy(a => a.DateTime.DateTime)
+                                                                                          .ToDictionary(a => a.StopArea, a => a.DateTime.DateTime);
 
-            List<StopArea> result = (from sa in stopareas
-                                     join s in firstSchedule on sa equals s.Key
-                                     orderby s.Value
-                                     select sa).ToList();
+                    result = (from sa in stopareas
+                              join s in firstSchedule on sa equals s.Key
+                              orderby s.Value
+                              select sa).ToList();
+                }
+                else
+                {
+                    // No schedule dates. stopAreas must be then taken from route schedule, in schedule order
+                    result = (from row in routeSchedule.Table.Rows
+                              let sp = _sncfRepo.StopPoints.Where(stopPoint => stopPoint.Id == row.StopPoint.Id).First()
+                              select sp.StopArea).ToList();
+
+
+                }
+                return result;
+            }
+            catch (Exception)
+            {
+                result = stopareas;
+            }
             return result;
-
         }
+
+        private int GetStopAreaIndexWithoutSchedule(StopArea sa, StopArea origin, StopArea dest)
+        {
+            return sa.Id == origin.Id ? 0
+                : sa.Id == dest.Id ? 2
+                : 1;
+        }
+
+
 
         #endregion
     }
