@@ -186,18 +186,16 @@ namespace SncfOpenData
                         HashSet<int> ignNodes = GetStopAreaIgnNodes(stopareas);
                         var nodesIds = "(" + String.Join<int>("),(", ignNodes) + ")"; // insert clause
 
-                       
-
                         pathfinder.FindPath(ignNodes, 5000);
-                      
-                       
-                    
+
+
+
                         // TODO : Dijkstra for all troncons within envelope of all line stop areas
                         //FindPath(topologyByTroncon, topologyByNode, tronconsInRoute.ToDictionary(t => t.Id, t => t), ignNodes.First(), ignNodes.Last());
                     }
                 }
 
-               
+
             }
         }
 
@@ -236,7 +234,7 @@ namespace SncfOpenData
             //var path = dijkstra.FindShortestPathBetween(graphNodes[ignNodeStartId], graphNodes[ignNodeEndId]);
         }
 
-      
+
 
         private HashSet<int> GetStopAreaIgnNodes(List<StopArea> stopareas)
         {
@@ -244,7 +242,7 @@ namespace SncfOpenData
         }
 
 
-      
+
 
         public void ShowStopAreasOnMap(SncfRepository _sncfRepo, IGNRepository _ignRepo, string wkt = null)
         {
