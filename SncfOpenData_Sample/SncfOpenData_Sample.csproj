@@ -66,6 +66,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="App\CoreService.cs" />
+    <Compile Include="App\Topology\PathFinder.cs" />
+    <Compile Include="App\Topology\Topology.cs" />
     <Compile Include="GraphCollection\Dijkstra.cs" />
     <Compile Include="GraphCollection\GraphNode.cs" />
     <Compile Include="GraphCollection\IQueue.cs" />

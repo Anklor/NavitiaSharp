@@ -160,11 +160,12 @@ namespace SncfOpenData
 
             var nodes = _ignRepo.GetAllNoeuds_Lambert93();
             var troncons = _ignRepo.GetAllTroncons_Lambert93();
+            PathFinder pathfinder = new PathFinder(troncons, nodes);
 
             IEnumerable<Route> routes = _sncfRepo.Routes;
             // debug test route
             routes = routes.Take(1);
-            routes = routes.Where(r => r.Id == "route:OCE:104647-TrainTER-87581009-87592006");
+            //routes = routes.Where(r => r.Id == "route:OCE:104647-TrainTER-87581009-87592006");
 
             foreach (Route route in routes)
             {
@@ -185,18 +186,14 @@ namespace SncfOpenData
                         HashSet<int> ignNodes = GetStopAreaIgnNodes(stopareas);
                         var nodesIds = "(" + String.Join<int>("),(", ignNodes) + ")"; // insert clause
 
-                        SqlGeometry geom = GetNodesGeometryAggregate(FilterNodes(nodes, ignNodes));
-                        geom = geom.STEnvelope().STBuffer(5000);
+                       
 
-                        var tronconsInRoute = FilterTroncons(troncons, geom).ToList();
-                        var nodesInRoute = FilterNodes(nodes, geom).ToList();
-
-                        // Generate topology
-                        var topologyByTroncon = GetTopologyByTroncon(tronconsInRoute, nodesInRoute);
-                        var topologyByNode = GetTopologyByNode(tronconsInRoute, nodesInRoute);
-
+                        pathfinder.FindPath(ignNodes, 5000);
+                      
+                       
+                    
                         // TODO : Dijkstra for all troncons within envelope of all line stop areas
-                        FindPath(topologyByTroncon, topologyByNode, tronconsInRoute.ToDictionary(t => t.Id, t => t), ignNodes.First(), ignNodes.Last());
+                        //FindPath(topologyByTroncon, topologyByNode, tronconsInRoute.ToDictionary(t => t.Id, t => t), ignNodes.First(), ignNodes.Last());
                     }
                 }
 
@@ -239,50 +236,15 @@ namespace SncfOpenData
             //var path = dijkstra.FindShortestPathBetween(graphNodes[ignNodeStartId], graphNodes[ignNodeEndId]);
         }
 
-        private Dictionary<int, HashSet<int>> GetTopologyByTroncon(List<Troncon> tronconsInRoute, List<Noeud> nodesInRoute)
-        {
-            var query = from troncon in tronconsInRoute
-                        let connectedNodes = nodesInRoute.Where(n => n.Geometry.STIntersects(troncon.Geometry).IsTrue)
-                        select new { IdTroncon = troncon.Id, Nodes = connectedNodes.Select(n => n.Id) };
-            return query.ToDictionary(a => a.IdTroncon, a => new HashSet<int>(a.Nodes));
-        }
-        private Dictionary<int, HashSet<int>> GetTopologyByNode(List<Troncon> tronconsInRoute, List<Noeud> nodesInRoute)
-        {
-            var query = from node in nodesInRoute
-                        let connectedTroncons = tronconsInRoute.Where(n => n.Geometry.STIntersects(node.Geometry).IsTrue)
-                        select new { IdNode = node.Id, Troncons = connectedTroncons.Select(n => n.Id) };
-            return query.ToDictionary(a => a.IdNode, a => new HashSet<int>(a.Troncons));
-        }
+      
 
         private HashSet<int> GetStopAreaIgnNodes(List<StopArea> stopareas)
         {
             return new HashSet<int>(stopareas.Select(sa => _sncfRepo.IgnNodeByStopArea[sa.Id]));
         }
 
-        private IEnumerable<Noeud> FilterNodes(Dictionary<int, Noeud> nodes, HashSet<int> keys)
-        {
-            return nodes.Where(kvp => keys.Contains(kvp.Key)).Select(kvp => kvp.Value);
-        }
-        private IEnumerable<Noeud> FilterNodes(Dictionary<int, Noeud> nodes, SqlGeometry geomFilter)
-        {
-            return nodes.Where(kvp => kvp.Value.Geometry.STIntersects(geomFilter).Value == true)
-                            .Select(t => t.Value);
-        }
-        private IEnumerable<Troncon> FilterTroncons(Dictionary<int, Troncon> troncons, SqlGeometry geomFilter)
-        {
-            return troncons.Where(kvp => kvp.Value.Geometry.STIntersects(geomFilter).Value == true)
-                            .Select(t => t.Value);
-        }
 
-        private SqlGeometry GetNodesGeometryAggregate(IEnumerable<Noeud> nodes)
-        {
-            SqlGeometry geom = SqlTypesExtensions.PointEmpty_SqlGeometry(2154);
-            foreach (var pointGeom in nodes)
-            {
-                geom = geom.STUnion(pointGeom.Geometry);
-            }
-            return geom;
-        }
+      
 
         public void ShowStopAreasOnMap(SncfRepository _sncfRepo, IGNRepository _ignRepo, string wkt = null)
         {
