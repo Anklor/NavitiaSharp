@@ -38,5 +38,40 @@ namespace SncfOpenData.App.Topology
 
 			return this.Equals(objTyped);
 		}
-	}
+
+        public override string ToString()
+        {
+            return Id.ToString();
+        }
+    }
+
+    public class TopoTroncon : IEquatable<TopoTroncon>
+    {
+        public int IdTroncon { get; set; }
+        public HashSet<int> IdNodes { get; set; }
+        public SqlGeometry Geometry { get; set; }
+
+        public TopoTroncon()
+        {
+            IdNodes = new HashSet<int>();
+        }
+        public bool Equals(TopoTroncon other)
+        {
+            return this.GetHashCode().Equals(other.GetHashCode());
+        }
+
+        public override int GetHashCode()
+        {
+            return IdTroncon;
+        }
+
+        public override bool Equals(object obj)
+        {
+            TopoTroncon objTyped = obj as TopoTroncon;
+            if (objTyped == null)
+                return false;
+
+            return this.Equals(objTyped);
+        }
+    }
 }

@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using SncfOpenData.IGN.Model;
 using Microsoft.SqlServer.Types;
 using SqlServerSpatial.Toolkit;
+using SncfOpenData.App.Topology;
 
 namespace SncfOpenData
 {
@@ -51,13 +52,32 @@ namespace SncfOpenData
                 Noeud stop = checkpoints[keys[i + 1]];
 
 
-                var topoNodesStart = topology.TopoNodes.Where(n => n.Geometry.STEquals(start.Geometry).IsTrue).Single();
-                var topoNodesEnd = topology.TopoNodes.Where(n => n.Geometry.STEquals(stop.Geometry).IsTrue).Single();
+                var topoNodeStart = topology.TopoNodes.Where(n => n.Value.Geometry.STEquals(start.Geometry).IsTrue).Single().Value;
+                var topoNodeEnd = topology.TopoNodes.Where(n => n.Value.Geometry.STEquals(stop.Geometry).IsTrue).Single().Value;
 
                 // find path
-
+                List<TopoNode> accessibleNodes = GetAccessibleNodes(topology, topoNodeStart);
+                
 
             }
+        }
+
+        private List<TopoNode> GetAccessibleNodes(Topology topology, TopoNode topoNode)
+        {
+            HashSet<int> visitedIds = new HashSet<int>();
+
+            if (topoNode.IdTroncons.Any())
+            {
+                foreach (var idTroncon in topoNode.IdTroncons)
+                {
+                    if (topology.TopoTroncons.ContainsKey(idTroncon))
+                    {
+                        TopoTroncon trn = topology.TopoTroncons[idTroncon];
+                        visitedIds.UnionWith(trn.IdNodes);                       
+                    }
+                }
+            }
+            return topology.TopoNodes.Where(kvp => visitedIds.Contains(kvp.Key)).Select(v => v.Value).ToList();
         }
 
         #region Helpers
