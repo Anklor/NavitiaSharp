@@ -171,7 +171,9 @@ namespace SncfOpenData
             {
                 // How to get proper order for stop areas ?
                 // Let's look at route schedules
-                RouteSchedule schedule = _sncfRepo.GetRouteSchedule(route, false);
+                List<RouteSchedule> schedules = _sncfRepo.GetRouteSchedules(route, false);
+                Debug.Assert(schedules.Count == 1, $"Zero or more than one schedule for route {route.Name}");
+                var schedule = schedules.First();
                 if (schedule != null && schedule.Table.WithSchedule)
                 {
                     List<StopArea> stopareas = null;

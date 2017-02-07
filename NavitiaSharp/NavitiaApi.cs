@@ -125,6 +125,13 @@ namespace SncfOpenData
 
             return GetPagedResult<RouteSchedule>(request, "route_schedules", numResults, numPage);      
         }
+        public PagedResult<RouteSchedule> GetRouteRouteSchedules(string routeId, int numResults = 25, int numPage = 0)
+        {
+            var request = new RestRequest();
+            request.Resource = $"/routes/{routeId}/route_schedules";
+
+            return GetPagedResult<RouteSchedule>(request, "route_schedules", numResults, numPage);
+        }
 
         public PagedResult<T> GetPagedResult<T>(string resourcePath, int numResults = 25, int numPage = 0) where T : new()
         {

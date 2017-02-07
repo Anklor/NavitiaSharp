@@ -79,6 +79,8 @@ namespace SncfOpenData
             }
             internal set { _lineRouteSchedules = value; }
         }
+        private Dictionary<string, List<RouteSchedule>> _routeRouteSchedules;
+
         private Dictionary<string, List<StopArea>> _linesStopAreas;
         public Dictionary<string, List<StopArea>> LinesStopAreas
         {
@@ -185,49 +187,40 @@ namespace SncfOpenData
             }
         }
 
-        public List<RouteSchedule> GetLineRouteSchedules(Line line, bool fromApi = false)
+        public List<RouteSchedule> GetRouteSchedules(Route route, bool fromApi = false)
         {
             List<RouteSchedule> allItems = null;
-            if (line != null)
+            if (route != null)
             {
                 if (fromApi)
                 {
-                    allItems = GetAllPagedResults<RouteSchedule>(_api, (n, p) => _api.GetLineRouteSchedules(line.Id, n, p), ChunckSize);
+                    allItems = GetAllPagedResults<RouteSchedule>(_api, (n, p) => _api.GetRouteRouteSchedules(route.Id, n, p), ChunckSize);
                 }
                 else
                 {
-                    if (this.LineRouteSchedules.ContainsKey(line.Id))
+                    if (_routeRouteSchedules == null) _routeRouteSchedules = new Dictionary<string, List<RouteSchedule>>();
+                    if (!_routeRouteSchedules.ContainsKey(route.Id))
                     {
-                        return this.LineRouteSchedules[line.Id];
+                        string fileName = "route_schedules\\route.{id}.route_schedules.json".Replace("{id}", SafeFileId(route.Id));
+                        _routeRouteSchedules[route.Id] = LoadSavedDataList<RouteSchedule>(fileName);
                     }
-                    else
-                    {
-                        return new List<RouteSchedule>();
-                    }
+                    return _routeRouteSchedules[route.Id];
                 }
             }
             return allItems;
         }
-        public RouteSchedule GetRouteSchedule(Route route, bool fromApi = false)
-        {
-            List<RouteSchedule> routeSchedules = routeSchedules = GetLineRouteSchedules(route.Line, fromApi);
 
-            if (routeSchedules != null)
-            {
-                RouteSchedule rs = GetRouteScheduleForRoute(routeSchedules, route);
-                return rs;
-            }
-            return null;
-        }
-        public RouteSchedule GetRouteScheduleForRoute(List<RouteSchedule> lineSchedules, Route route)
+        
+        
+        public RouteSchedule GetRouteScheduleForRoute(List<RouteSchedule> routeSchedules, Route route)
         {
-            var routeSchedules = (from schedule in lineSchedules
-                                           where route.Id == GetRouteIdFromSchedule(schedule) && schedule.DisplayInformations.Direction == route.Direction.StopArea.Label
-                                           select schedule).ToList();
+            var schedules = (from schedule in routeSchedules
+                             where route.Id == GetRouteIdFromSchedule(schedule) && schedule.DisplayInformations.Direction == route.Direction.StopArea.Label
+                             select schedule).ToList();
 
-            Debug.Assert(routeSchedules.Count > 0, "No route schedules. Check destination match with stop area label !");
-            Debug.Assert(routeSchedules.Count == 1, "Multiple route schedules !");
-            return routeSchedules.First();
+            Debug.Assert(schedules.Count > 0, "No route schedules. Check destination match with stop area label !");
+            Debug.Assert(schedules.Count == 1, "Multiple route schedules !");
+            return schedules.First();
         }
         public string GetRouteIdFromSchedule(RouteSchedule schedule)
         {
@@ -479,7 +472,7 @@ namespace SncfOpenData
                 try
                 {
                     List<TRelated> allRelatedItems = GetAllPagedResults<TRelated>(sncfApi, patternPathToRelatedResource.Replace("{id}", baseItem.Id), 100);
-                   
+
                     var json = JsonConvert.SerializeObject(allRelatedItems, Formatting.Indented);
                     File.WriteAllText(Path.Combine(dataDirectory, outputFileNamePattern.Replace("{id}", SafeFileId(baseItem.Id))), json);
                 }
