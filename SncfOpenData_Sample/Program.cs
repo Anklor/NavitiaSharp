@@ -1,4 +1,5 @@
-﻿using SncfOpenData.IGN;
+﻿using NavitiaSharp;
+using SncfOpenData.IGN;
 using System;
 using System.IO;
 
@@ -18,18 +19,9 @@ namespace SncfOpenData
             SncfRepository repo = new SncfRepository(DATA_DIR_SNCF, 1000);
             CoreService core = new CoreService(repo, ignService);
 
-            core.MatchRoutesWithTronconsIGN();
+            //core.MatchRoutesWithTronconsIGN();
 
-            //select N.ID_RTE500 As ID_NOEUD
-            //  ,T.ID_RTE500 as ID_TRONCON
-            //from NOEUD_FERRE_2154 N
-            //left
-            //join TRONCON_VOIE_FERREE_2154 T
-
-            //on N.geom2154.STIntersects(T.geom2154) = 1
-            //order by ID_NOEUD
-
-
+           
             //ShowStopAreasOnMap(repo, "POLYGON((5.2734375 43.259580971072275,5.41351318359375 43.1614915129406,5.4986572265625 43.295574211963746,5.5810546875 43.42936191764414,5.90789794921875 43.57678451504994,5.877685546875 43.74766111392921,5.88043212890625 43.86064850339098,5.62225341796875 43.75559702541283,5.4327392578125 43.670230832122314,5.27069091796875 43.58474304793296,5.23773193359375 43.431356514362626,5.2734375 43.259580971072275))");
 
             // Saves data identified as "static", ie: does not change often and can save remote Hits
@@ -37,6 +29,7 @@ namespace SncfOpenData
             //repo.SaveStaticData();
             // Line line = sncfApi.GetLine("line:OCE:SN-87276055-87276139");
 
+            repo.GetAndSavedRelatedData_Detail<Route, RouteSchedule>(repo.Api, repo.Routes, "routes/{id}/route_schedules", DATA_DIR_SNCF, "route_schedules\\route.{id}.route_schedules.json");
             //repo.GetAndSavedRelatedData<Line, StopArea>(repo.Api, repo.Lines, "lines/{id}/stop_areas", DATA_DIR_SNCF, "lines.stop_areas.json");
             //repo.GetAndSavedRelatedData<Route, StopArea>(repo.Api, repo.Routes, "routes/{id}/stop_areas", DATA_DIR_SNCF, "routes.stop_areas.json");
 

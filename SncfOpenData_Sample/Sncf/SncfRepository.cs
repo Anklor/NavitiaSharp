@@ -253,7 +253,7 @@ namespace SncfOpenData
                 {
                     List<RouteSchedule> allItems = GetAllPagedResults<RouteSchedule>(sncfApi, (n, p) => sncfApi.GetLineRouteSchedules(line.Id, n, p), chunkSize);
                     var json = JsonConvert.SerializeObject(allItems, Formatting.Indented);
-                    File.WriteAllText(Path.Combine(schedulesDir, $"{line.Id.Replace(":", ".")}.json"), json);
+                    File.WriteAllText(Path.Combine(schedulesDir, $"{SafeFileId(line.Id)}.json"), json);
                 }
                 catch (Exception ex)
                 {
@@ -262,6 +262,11 @@ namespace SncfOpenData
 
 
             }
+        }
+
+        private string SafeFileId(string navitiaId)
+        {
+            return navitiaId.Replace(":", ".");
         }
 
         public void TestQueryWithStopName(string str2Find)
@@ -419,7 +424,7 @@ namespace SncfOpenData
                     List<TRelated> allRelatedItems = GetAllPagedResults<TRelated>(sncfApi, patternPathToRelatedResource.Replace("{id}", baseItem.Id), 100);
                     dic.AddOrUpdate(baseItem.Id, allRelatedItems, AddRelatedItem);
                 }
-                catch (KeyNotFoundException v_notFoundException)
+                catch (KeyNotFoundException)
                 {
                     dic.AddOrUpdate(baseItem.Id, new List<TRelated>(), AddRelatedItem);
                     Trace.TraceWarning("GetAndSavedRelatedData. Not found.");
@@ -431,25 +436,6 @@ namespace SncfOpenData
 
             }
             );
-            //foreach (TBase baseItem in baseResourceList)
-            //{
-            //    try
-            //    {
-            //        List<TRelated> allRelatedItems = GetAllPagedResults<TRelated>(sncfApi, patternPathToRelatedResource.Replace("{id}", baseItem.Id), 100);
-            //        dic.AddOrUpdate(baseItem.Id, allRelatedItems, AddRelatedItem);
-            //    }
-            //    catch(KeyNotFoundException v_notFoundException)
-            //    {
-            //        dic.AddOrUpdate(baseItem.Id, new List<TRelated>(), AddRelatedItem);
-            //        Trace.TraceWarning("GetAndSavedRelatedData. Not found.");
-            //    }
-            //    catch (Exception v_ex)
-            //    {
-            //        Trace.TraceWarning($"GetAndSavedRelatedData. Error : {v_ex.Message}");
-            //    }
-
-            //}
-
             //var json = JsonConvert.SerializeObject(dic, Formatting.None);
             //File.WriteAllText(Path.Combine(dataDirectory, outputFileName), json);
 
@@ -459,6 +445,55 @@ namespace SncfOpenData
             var json = JsonConvert.SerializeObject(outDic, Formatting.None);
             File.WriteAllText(Path.Combine(dataDirectory, outputFileName), json);
             return outDic;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <typeparam name="TBase"></typeparam>
+        /// <typeparam name="TRelated"></typeparam>
+        /// <param name="sncfApi"></param>
+        /// <param name="baseResourceList"></param>
+        /// <param name="patternPathToRelatedResource"></param>
+        /// <param name="dataDirectory"></param>
+        /// <param name="outputFileNamePattern">Should contain {id}</param>
+        /// <returns></returns>
+        public void GetAndSavedRelatedData_Detail<TBase, TRelated>(SncfApi sncfApi,
+                                                                                            List<TBase> baseResourceList,
+                                                                                            string patternPathToRelatedResource,
+                                                                                            string dataDirectory,
+                                                                                            string outputFileNamePattern) where TBase : ApiResourceBase, new()
+                                                                                                                   where TRelated : new()
+        {
+
+            if (!outputFileNamePattern.Contains("{id}"))
+            {
+                throw new ArgumentException("outputFileNamePattern should contain {id}.");
+            }
+            string v_directory = Path.GetDirectoryName(Path.Combine(dataDirectory, outputFileNamePattern.Replace("{id}", "")));
+            Directory.CreateDirectory(v_directory);
+
+            Parallel.ForEach(baseResourceList, baseItem =>
+            //foreach (var baseItem in baseResourceList)
+            {
+                try
+                {
+                    List<TRelated> allRelatedItems = GetAllPagedResults<TRelated>(sncfApi, patternPathToRelatedResource.Replace("{id}", baseItem.Id), 100);
+                   
+                    var json = JsonConvert.SerializeObject(allRelatedItems, Formatting.Indented);
+                    File.WriteAllText(Path.Combine(dataDirectory, outputFileNamePattern.Replace("{id}", SafeFileId(baseItem.Id))), json);
+                }
+                catch (KeyNotFoundException)
+                {
+                    Trace.TraceWarning($"GetAndSavedRelatedData. Not found for {baseItem.Id}");
+                }
+                catch (Exception v_ex)
+                {
+                    Trace.TraceWarning($"GetAndSavedRelatedData. Error for {baseItem.Id} : {v_ex.Message}");
+                }
+
+            }
+            );
         }
 
         private List<TRelated> AddRelatedItem<TRelated>(string arg1, List<TRelated> arg2) where TRelated : new()
