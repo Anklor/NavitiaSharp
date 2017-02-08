@@ -204,39 +204,6 @@ namespace SncfOpenData
 
 
 
-        private void FindPath(Dictionary<int, HashSet<int>> nodesByTroncon, Dictionary<int, HashSet<int>> tronconsByNode, Dictionary<int, Troncon> troncons, int ignNodeStartId, int ignNodeEndId)
-        {
-            Dictionary<int, GraphNode<int>> graphNodes = tronconsByNode.Select(kvp => kvp.Key).ToDictionary(k => k, k => new GraphNode<int>(k));
-
-            foreach (var tronconNodes in nodesByTroncon)
-            {
-                if (tronconNodes.Value != null && tronconNodes.Value.Count > 1)
-                {
-                    GraphNode<int> gNodeStart = graphNodes[tronconNodes.Value.First()];
-                    GraphNode<int> gNodeEnd = graphNodes[tronconNodes.Value.Last()];
-                    gNodeStart.AddNeighbour(gNodeEnd, 1);
-                    gNodeEnd.AddNeighbour(gNodeStart, 1);
-                }
-            }
-            //foreach (var nodeTroncons in tronconsByNode)
-            //{
-            //    GraphNode<int> gNode = graphNodes[nodeTroncons.Key];
-            //    visited.Add(nodeTroncons.Key);
-
-            //    foreach (var idTroncon in nodeTroncons.Value)
-            //    {
-            //        foreach (int idNode in nodesByTroncon[idTroncon])
-            //        {
-            //            gNode.AddNeighbour(graphNodes[idNode], (int)troncons[idTroncon].Geometry.STLength().Value);
-            //        }
-
-            //    }
-            //}
-
-            //var dijkstra = new Dijkstra<int>(graphNodes.Values);
-            //var path = dijkstra.FindShortestPathBetween(graphNodes[ignNodeStartId], graphNodes[ignNodeEndId]);
-        }
-
 
 
         private HashSet<int> GetStopAreaIgnNodes(List<StopArea> stopareas)
