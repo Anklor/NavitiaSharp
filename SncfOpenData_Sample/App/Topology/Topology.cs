@@ -96,7 +96,7 @@ namespace SncfOpenData
             }
 
             foreach (var troncon in connectedTroncons)
-            {
+            {   
                 foreach (var tronconOther in connectedTroncons.Where(t => t.Id != troncon.Id))
                 {
                     var angle = Geometry.AngleBetweenLines(troncon.Geometry, tronconOther.Geometry);
