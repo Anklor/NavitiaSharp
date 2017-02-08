@@ -1,5 +1,7 @@
-﻿using System;
+﻿using Microsoft.SqlServer.Types;
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -23,19 +25,47 @@ namespace SncfOpenData.App.Topology
             return Math.Atan2(dy, dx);
         }
 
-        //  cos(a) = dx²/(dx²+dy²)
-        public static double CalculateHeading(Microsoft.SqlServer.Types.SqlGeometry p0, Microsoft.SqlServer.Types.SqlGeometry p1)
+        /// <summary>
+        /// Return angle between two segments
+        /// see http://www.euclideanspace.com/maths/algebra/vectors/angleBetween/
+        /// </summary>
+        /// <param name="seg1"></param>
+        /// <param name="seg2"></param>
+        /// <returns></returns>
+        public static double AngleBetweenSegments(SqlGeometry seg1, SqlGeometry seg2)
         {
-            double dx = p0.STX.Value - p1.STX.Value;
-            double dy = p0.STY.Value - p1.STY.Value;
-            if (dx == 0 || dy == 0)
-                return 0;
+            if (!IsSegment(seg1))
+                throw new ArgumentException("seg1 must be a segment!");
 
-            double cos = (dx * dx) / (dx * dx + dy * dy);
-            var angle = Math.Acos(cos);
+            if (!IsSegment(seg2))
+                throw new ArgumentException("seg2 must be a segment!");
+
+
+            //angle = acos(A•B) where • is Ax * Bx + Ay * By
+            double x1 = seg1.STEndPoint().STX.Value - seg1.STStartPoint().STX.Value;
+            double x2 = seg2.STEndPoint().STX.Value - seg2.STStartPoint().STX.Value;
+           
+            double y1 = seg1.STEndPoint().STY.Value - seg1.STStartPoint().STY.Value;
+            double y2 = seg2.STEndPoint().STY.Value - seg2.STStartPoint().STY.Value;
+            double[] normalized1 = Normalize(new double[] { x1, y1 });
+            double[] normalized2 = Normalize(new double[] { x2, y2 });
+
+            double angle = Math.Acos(normalized1[0] * normalized2[0] + normalized1[1] * normalized2[1]);
             return angle;
         }
 
+        public static double[] Normalize(double[] coords)
+        {
+            double distance = Math.Sqrt(coords[0] * coords[0] + coords[1] * coords[1]);
+            return new double[] { coords[0] / distance, coords[1] / distance };
+        }
+
+        public static bool IsSegment(SqlGeometry segment)
+        {
+            return segment != null
+                 && segment.STGeometryType().Value.ToUpper() == "LINESTRING"
+                 && segment.STNumPoints().Value == 2;
+        }
         ///<summary>
         /// Converts from radians to degrees.
         ///</summary>

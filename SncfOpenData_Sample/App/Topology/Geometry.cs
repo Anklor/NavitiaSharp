@@ -49,7 +49,7 @@ namespace SncfOpenData.App.Topology
             return segment;
         }
 
-        public static SqlGeometry FirstSegment(SqlGeometry line, SqlGeometry origin)
+        public static SqlGeometry FirstSegmentFrom(SqlGeometry line, SqlGeometry origin)
         {
             SqlGeometry segment = null;
 
@@ -83,15 +83,26 @@ namespace SncfOpenData.App.Topology
             return gb.ConstructedGeometry;
         }
 
-        public static SqlGeometry Union(params SqlGeometry[] geoms)
+        public static SqlGeometry Union(float buffer, params SqlGeometry[] geoms)
         {
             int srid = geoms.First().STSrid.Value;
             var union = SqlTypesExtensions.PointEmpty_SqlGeometry(srid);
             foreach(var g in geoms)
             {
-                union = union.STUnion(g);
+                union = union.STUnion(buffer == 0 ? g : g.STBuffer(buffer));
             }
             return union;
+        }
+
+        public static double AngleBetweenLines(SqlGeometry line1, SqlGeometry line2)
+        {
+            SqlGeometry connectionPoint = line1.STIntersection(line2);
+
+            SqlGeometry segment1 = FirstSegmentFrom(line1, connectionPoint);
+            SqlGeometry segment2 = FirstSegmentFrom(line2, connectionPoint);
+
+            return Angle.AngleBetweenSegments(segment1, segment2);
+
         }
     }
 }

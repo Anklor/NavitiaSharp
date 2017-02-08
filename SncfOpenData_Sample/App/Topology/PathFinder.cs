@@ -57,7 +57,7 @@ namespace SncfOpenData
         /// <returns></returns>
         private List<Troncon> FindPath_GraphCollection(Topology topology, Dictionary<int, Noeud> stopPoints)
         {
-            IEnumerable<GraphNode<int>> graph = CalculateGraph(topology, stopPoints);
+            IEnumerable<GraphNode<int>> graph = GenerateGraph(topology, stopPoints);
 
             IList<GraphNode<int>> path = FindShortestPath(topology, graph, stopPoints);
 
@@ -67,7 +67,14 @@ namespace SncfOpenData
 
         #region FindPath_GraphCollection
 
-        private IEnumerable<GraphNode<int>> CalculateGraph(Topology topology, Dictionary<int, Noeud> stopPoints)
+        /// <summary>
+        /// Generates graph
+        /// Ensure heading-compatible edges are connected
+        /// </summary>
+        /// <param name="topology"></param>
+        /// <param name="stopPoints"></param>
+        /// <returns></returns>
+        private IEnumerable<GraphNode<int>> GenerateGraph(Topology topology, Dictionary<int, Noeud> stopPoints)
         {
             Dictionary<int, GraphNode<int>> graphNodes = topology.TopoNodes.ToDictionary(node => node.Key, node => new GraphNode<int>(node.Key));
 
