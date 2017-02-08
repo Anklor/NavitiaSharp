@@ -7,6 +7,7 @@ using SncfOpenData.IGN.Model;
 using Microsoft.SqlServer.Types;
 using SqlServerSpatial.Toolkit;
 using SncfOpenData.App.Topology;
+using GraphCollection;
 
 namespace SncfOpenData
 {
@@ -27,7 +28,7 @@ namespace SncfOpenData
         /// </summary>
         /// <param name="checkpoints"></param>
         /// <param name="bufferAroundPoints">Distance around point to minimize network analysis</param>
-        internal void FindPath(HashSet<int> checkpoints, int bufferAroundPoints = 5000)
+        internal List<Troncon> FindPath(HashSet<int> checkpoints, int bufferAroundPoints = 5000)
         {
             Dictionary<int, Noeud> ignNodes = FilterNodesById(_nodes, checkpoints);
 
@@ -40,7 +41,48 @@ namespace SncfOpenData
             // Generate topology
             var topology = Topology.Compute(tronconsInRoute, ignNodes.Values.ToList());
 
-            FindPath(topology, ignNodes);
+            //FindPath(topology, ignNodes);
+            var troncons = FindPath_GraphCollection(topology, ignNodes);
+            return troncons;
+        }
+
+        private List<Troncon> FindPath_GraphCollection(Topology topology, Dictionary<int, Noeud> checkpoints)
+        {
+            Dictionary<int, GraphNode<int>> graphNodes = topology.TopoNodes.Select(kvp => kvp.Key).ToDictionary(k => k, k => new GraphNode<int>(k));
+            var topoNodeStart = topology.TopoNodes.Where(n => n.Value.Geometry.STEquals(checkpoints.First().Value.Geometry).IsTrue).Single().Value;
+            var topoNodeEnd = topology.TopoNodes.Where(n => n.Value.Geometry.STEquals(checkpoints.Last().Value.Geometry).IsTrue).Single().Value;
+            foreach (var node in topology.TopoNodes)
+            {
+                // find nodes directly reachable from node
+                Dictionary<TopoTroncon, TopoNode> accessibleNodes = GetAccessibleNodes(topology, node.Value);
+                foreach (var closeNode in accessibleNodes)
+                {
+                    GraphNode<int> gNodeStart = graphNodes[node.Value.Id];
+                    GraphNode<int> gNodeEnd = graphNodes[closeNode.Value.Id];
+                    gNodeStart.AddNeighbour(gNodeEnd, (int)closeNode.Key.Geometry.STLength().Value);
+                }
+            }
+
+            var dijkstra = new Dijkstra<int>(graphNodes.Values);
+            var path = dijkstra.FindShortestPathBetween(graphNodes[topoNodeStart.Id], graphNodes[topoNodeEnd.Id]);
+
+            List<Troncon> pathInTroncons = new List<Troncon>();
+            for (int i = 0; i < path.Count - 1; i++)
+            {
+                var current = path[i];
+                var next = path[i + 1];
+                pathInTroncons.Add(GetTronconBetweenNodes(topology, current.Value, next.Value));
+            }
+
+            return pathInTroncons;
+        }
+
+        private Troncon GetTronconBetweenNodes(Topology topology, int nodeIdFrom, int nodeIdTo)
+        {
+            Troncon trn = topology.TopoTroncons.Where(kvp => kvp.Value.IdNodes.Contains(nodeIdFrom) && kvp.Value.IdNodes.Contains(nodeIdTo))
+                                 .Select(t => topology.Troncons.First(baseTrn => baseTrn.Id == t.Value.IdTroncon))
+                                 .Single();
+            return trn;
         }
 
         private void FindPath(Topology topology, Dictionary<int, Noeud> checkpoints)
@@ -56,15 +98,16 @@ namespace SncfOpenData
                 var topoNodeEnd = topology.TopoNodes.Where(n => n.Value.Geometry.STEquals(stop.Geometry).IsTrue).Single().Value;
 
                 // find path
-                List<TopoNode> accessibleNodes = GetAccessibleNodes(topology, topoNodeStart);
-                
+                //List<TopoNode> accessibleNodes = GetAccessibleNodes(topology, topoNodeStart);
+
 
             }
         }
 
-        private List<TopoNode> GetAccessibleNodes(Topology topology, TopoNode topoNode)
+        // TODO : check in troncon has compatible headings
+        private Dictionary<TopoTroncon, TopoNode> GetAccessibleNodes(Topology topology, TopoNode topoNode)
         {
-            HashSet<int> visitedIds = new HashSet<int>();
+            Dictionary<TopoTroncon, TopoNode> nodesByTroncon = new Dictionary<TopoTroncon, TopoNode>();
 
             if (topoNode.IdTroncons.Any())
             {
@@ -73,11 +116,13 @@ namespace SncfOpenData
                     if (topology.TopoTroncons.ContainsKey(idTroncon))
                     {
                         TopoTroncon trn = topology.TopoTroncons[idTroncon];
-                        visitedIds.UnionWith(trn.IdNodes);                       
+                        int idNode = trn.IdNodes.Except(new int[] { topoNode.Id }).SingleOrDefault();
+
+                        nodesByTroncon[trn] = topology.TopoNodes[idNode];
                     }
                 }
             }
-            return topology.TopoNodes.Where(kvp => visitedIds.Contains(kvp.Key)).Select(v => v.Value).ToList();
+            return nodesByTroncon;
         }
 
         #region Helpers
@@ -96,9 +141,18 @@ namespace SncfOpenData
         //      {
         //          return nodes.Where(kvp => keys.Contains(kvp.Key)).Select(kvp => kvp.Value);
         //      }
+        // Filter nodes catalog and returns sub catalog in the same order as keys
         private Dictionary<int, Noeud> FilterNodesById(Dictionary<int, Noeud> nodes, HashSet<int> keys)
         {
-            return nodes.Where(kvp => keys.Contains(kvp.Key)).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+            Dictionary<int, Noeud> filteredAndSorted = new Dictionary<int, Noeud>();
+            foreach (var nodeId in keys)
+            {
+                if (nodes.ContainsKey(nodeId))
+                {
+                    filteredAndSorted[nodeId] = nodes[nodeId];
+                }
+            }
+            return filteredAndSorted;
         }
         private IEnumerable<Noeud> FilterNodesByGeometry(Dictionary<int, Noeud> nodes, SqlGeometry geomFilter)
         {

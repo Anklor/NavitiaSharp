@@ -164,8 +164,8 @@ namespace SncfOpenData
 
             IEnumerable<Route> routes = _sncfRepo.Routes;
             // debug test route
-            routes = routes.Take(1);
-            //routes = routes.Where(r => r.Id == "route:OCE:104647-TrainTER-87581009-87592006");
+           //routes = routes.Take(1);
+            routes = routes.Where(r => r.Id == "route:OCE:104647-TrainTER-87581009-87592006");
 
             foreach (Route route in routes)
             {
@@ -188,7 +188,8 @@ namespace SncfOpenData
                         HashSet<int> ignNodes = GetStopAreaIgnNodes(stopareas);
                         var nodesIds = "(" + String.Join<int>("),(", ignNodes) + ")"; // insert clause
 
-                        pathfinder.FindPath(ignNodes, 5000);
+                        List<Troncon> path = pathfinder.FindPath(ignNodes, 5000);
+                        var tronconsIds = "(" + String.Join<int>("),(", path.Select(p => p.Id)) + ")"; // check path clause
 
 
 
