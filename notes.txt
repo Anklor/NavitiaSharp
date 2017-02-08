@@ -53,13 +53,19 @@ ORDER BY N.ID_RTE500
 
 -------------------------------------------------
 
+declare @bufferEnvelope float = 5000
+declare @bufferTroncon float = 30
+declare @bufferTronconResult float = 500
+
+declare @bufferStopPoint float = 750
+declare @bufferStartStop float = @bufferStopPoint*2
+
 declare @ids table (seq int identity, id int);
 insert into @ids (id) values (2112),(3705),(2598),(2600),(3691),(3573),(2067),(2068),(1478),(2722),(3399)
 
 declare @resultids table (seq int identity, idTroncon int);
 insert into @resultids (idTroncon) values 
 (3307),(3306),(5203),(5204),(1772),(3052),(3053),(3054),(3051),(3048),(3049),(3050),(3047),(1804),(1805),(1801),(1799),(1796),(1795),(1802),(1803),(1798),(1797),(1800),(1653),(1650),(1656),(1657),(1654),(1655),(1651),(1652),(336),(335),(334),(2221)
-
 declare @startId int
 declare @endId int 
 select top 1 @startId =  id from @ids order by seq
@@ -69,7 +75,7 @@ select top 1 @endId =  id from @ids order by seq desc
 declare @env geometry
 select @env = geometry::UnionAggregate(geom2154) from NOEUD_FERRE_2154
 where ID_RTE500 in (select id from @ids)
-select @env = @env.STEnvelope().STBuffer(5000).STEnvelope()
+select @env = @env.STEnvelope().STBuffer(@bufferEnvelope).STEnvelope()
 
 
 ---- All nodes
@@ -81,14 +87,14 @@ select @env = @env.STEnvelope().STBuffer(5000).STEnvelope()
 --union all	
 -- All troncons
 	select	ID_RTE500 AS ID_TRONCON
-	,geom2154.Reduce(100).STBuffer(30)
+	,geom2154.STBuffer(@bufferTroncon).Reduce(10)
 	, 'Troncon ' + cast(ID_RTE500 as varchar(10)) as Label
 	from TRONCON_VOIE_FERREE_2154
 	where geom2154.STIntersects(@env) = 1
 union all
 -- All stopareas
 	select	N.ID_RTE500 AS ID_NOEUD
-	, N.geom2154.STBuffer(1500)
+	, N.geom2154.STBuffer(@bufferStopPoint)
 	, 'StopArea' as Label
 	from NOEUD_FERRE_2154 N
 	where N.ID_RTE500 in (select id from @ids)
@@ -96,7 +102,7 @@ union all
 union all
 -- Start
 select	N.ID_RTE500 AS ID_NOEUD
-	, N.geom2154.STBuffer(3000)
+	, N.geom2154.STBuffer(@bufferStartStop)
 	, 'Start' as Label
 	from NOEUD_FERRE_2154 N
 	where N.ID_RTE500 = @startId
@@ -109,17 +115,19 @@ select	N.ID_RTE500 AS ID_NOEUD
 union all
 -- Stop
 select	N.ID_RTE500 AS ID_NOEUD
-	, N.geom2154.STBuffer(3000)
+	, N.geom2154.STBuffer(@bufferStartStop)
 	, 'Stop' as Label
 	from NOEUD_FERRE_2154 N
 	where N.ID_RTE500 = @endId
 union all
 -- CHECK RESULT
 select	T.ID_RTE500 AS ID_NOEUD
-	, T.geom2154.Reduce(100).STBuffer(1000).Reduce(10)
-	, null as Label
+	, T.geom2154.STBuffer(@bufferTronconResult).Reduce(10)
+	, cast(R.seq as varchar(5)) as Label
 	from TRONCON_VOIE_FERREE_2154 T
-	where T.ID_RTE500 IN (select idTroncon from @resultids)
+	join @resultids R
+		ON R.idTroncon = T.ID_RTE500
+	
 	--order by 1
 
 ----------------------------------------

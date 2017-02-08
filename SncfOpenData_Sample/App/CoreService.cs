@@ -146,25 +146,13 @@ namespace SncfOpenData
         /// </summary>
         public void MatchRoutesWithTronconsIGN()
         {
-            //foreach(Line line in _sncfRepo.Lines)
-            //{
-            //    HashSet<string> linkedRoutesId = new HashSet<string>(line.Routes.Select(lr => lr.Id));
-            //    List<StopArea> stopareas = null;
-            //    List<Route> routes = _sncfRepo.Routes.Where(r => linkedRoutesId.Contains(r.Id)).ToList();
-            //    if (_sncfRepo.LinesStopAreas.TryGetValue(line.Id, out stopareas))
-            //    {
-            //        List<int> ignNodes = stopareas.Select(sa => _sncfRepo.IgnNodeByStopArea[sa.Id]).ToList();
-            //        // TODO : Dijkstra for all troncons within envelope of all line stop areas
-            //    }
-            //}
-
             var nodes = _ignRepo.GetAllNoeuds_Lambert93();
             var troncons = _ignRepo.GetAllTroncons_Lambert93();
             PathFinder pathfinder = new PathFinder(troncons, nodes);
 
             IEnumerable<Route> routes = _sncfRepo.Routes;
             // debug test route
-           //routes = routes.Take(1);
+            //routes = routes.Take(1);
             routes = routes.Where(r => r.Id == "route:OCE:104647-TrainTER-87581009-87592006");
 
             foreach (Route route in routes)
@@ -202,17 +190,10 @@ namespace SncfOpenData
             }
         }
 
-
-
-
-
         private HashSet<int> GetStopAreaIgnNodes(List<StopArea> stopareas)
         {
             return new HashSet<int>(stopareas.Select(sa => _sncfRepo.IgnNodeByStopArea[sa.Id]));
         }
-
-
-
 
         public void ShowStopAreasOnMap(SncfRepository _sncfRepo, IGNRepository _ignRepo, string wkt = null)
         {

@@ -32,25 +32,45 @@ namespace SncfOpenData
         {
             Dictionary<int, Noeud> ignNodes = FilterNodesById(_nodes, checkpoints);
 
-            SqlGeometry geom = GetNodesGeometryAggregate(ignNodes.Values);
+            SqlGeometry geom = GetNodesGeometryAggregate(ignNodes.Values, 30);
             geom = geom.STEnvelope().STBuffer(bufferAroundPoints).STEnvelope();
-
             var tronconsInRoute = FilterTronconsByGeometry(_troncons, geom).ToList();
             var nodesInRoute = FilterNodesByGeometry(_nodes, geom).ToList();
 
             // Generate topology
             var topology = Topology.Compute(tronconsInRoute, ignNodes.Values.ToList());
 
-            //FindPath(topology, ignNodes);
+            // Launch path finding
             var troncons = FindPath_GraphCollection(topology, ignNodes);
             return troncons;
         }
 
-        private List<Troncon> FindPath_GraphCollection(Topology topology, Dictionary<int, Noeud> checkpoints)
+        /// <summary>
+        /// Creates a graph representing network railway, and performs a Dijkstra search to find best possible route.
+        /// This route must :
+        ///     - Pass by all checkpoints (stop points)
+        ///     - Must follow railway network (no hard turns) => lines crossing each other are in real life bridges or tunnels.
+        ///         Those intersections must be treated as distinct nodes connecting only heading-compatible edges
+        /// </summary>
+        /// <param name="topology"></param>
+        /// <param name="checkpoints"></param>
+        /// <returns></returns>
+        private List<Troncon> FindPath_GraphCollection(Topology topology, Dictionary<int, Noeud> stopPoints)
         {
-            Dictionary<int, GraphNode<int>> graphNodes = topology.TopoNodes.Select(kvp => kvp.Key).ToDictionary(k => k, k => new GraphNode<int>(k));
-            var topoNodeStart = topology.TopoNodes.Where(n => n.Value.Geometry.STEquals(checkpoints.First().Value.Geometry).IsTrue).Single().Value;
-            var topoNodeEnd = topology.TopoNodes.Where(n => n.Value.Geometry.STEquals(checkpoints.Last().Value.Geometry).IsTrue).Single().Value;
+            IEnumerable<GraphNode<int>> graph = CalculateGraph(topology, stopPoints);
+
+            IList<GraphNode<int>> path = FindShortestPath(topology, graph, stopPoints);
+
+            List<Troncon> troncons = TransformPathToEdgeList(topology, path);
+            return troncons;
+        }
+
+        #region FindPath_GraphCollection
+
+        private IEnumerable<GraphNode<int>> CalculateGraph(Topology topology, Dictionary<int, Noeud> stopPoints)
+        {
+            Dictionary<int, GraphNode<int>> graphNodes = topology.TopoNodes.ToDictionary(node => node.Key, node => new GraphNode<int>(node.Key));
+
             foreach (var node in topology.TopoNodes)
             {
                 // find nodes directly reachable from node
@@ -63,9 +83,26 @@ namespace SncfOpenData
                 }
             }
 
-            var dijkstra = new Dijkstra<int>(graphNodes.Values);
-            var path = dijkstra.FindShortestPathBetween(graphNodes[topoNodeStart.Id], graphNodes[topoNodeEnd.Id]);
+            return graphNodes.Values;
+        }
 
+        private IList<GraphNode<int>> FindShortestPath(Topology topology, IEnumerable<GraphNode<int>> graph, Dictionary<int, Noeud> stopPoints)
+        {
+            TopoNode topoNodeStart = topology.TopoNodes.Where(n => n.Value.Geometry.STEquals(stopPoints.First().Value.Geometry).IsTrue).Single().Value;
+            TopoNode topoNodeEnd = topology.TopoNodes.Where(n => n.Value.Geometry.STEquals(stopPoints.Last().Value.Geometry).IsTrue).Single().Value;
+
+            GraphNode<int> start = graph.Where(n => n.Value == topoNodeStart.Id).Single();
+            GraphNode<int> end = graph.Where(n => n.Value == topoNodeEnd.Id).Single();
+
+
+            var dijkstra = new Dijkstra<int>(graph);
+            var path = dijkstra.FindShortestPathBetween(start, end);
+
+            return path;
+        }
+
+        private List<Troncon> TransformPathToEdgeList(Topology topology, IList<GraphNode<int>> path)
+        {
             List<Troncon> pathInTroncons = new List<Troncon>();
             for (int i = 0; i < path.Count - 1; i++)
             {
@@ -73,7 +110,6 @@ namespace SncfOpenData
                 var next = path[i + 1];
                 pathInTroncons.Add(GetTronconBetweenNodes(topology, current.Value, next.Value));
             }
-
             return pathInTroncons;
         }
 
@@ -85,24 +121,7 @@ namespace SncfOpenData
             return trn;
         }
 
-        private void FindPath(Topology topology, Dictionary<int, Noeud> checkpoints)
-        {
-            List<int> keys = checkpoints.Keys.ToList();
-            for (int i = 0; i < keys.Count - 1; i++)
-            {
-                Noeud start = checkpoints[keys[i]];
-                Noeud stop = checkpoints[keys[i + 1]];
-
-
-                var topoNodeStart = topology.TopoNodes.Where(n => n.Value.Geometry.STEquals(start.Geometry).IsTrue).Single().Value;
-                var topoNodeEnd = topology.TopoNodes.Where(n => n.Value.Geometry.STEquals(stop.Geometry).IsTrue).Single().Value;
-
-                // find path
-                //List<TopoNode> accessibleNodes = GetAccessibleNodes(topology, topoNodeStart);
-
-
-            }
-        }
+        #endregion
 
         // TODO : check in troncon has compatible headings
         private Dictionary<TopoTroncon, TopoNode> GetAccessibleNodes(Topology topology, TopoNode topoNode)
@@ -127,12 +146,12 @@ namespace SncfOpenData
 
         #region Helpers
 
-        private SqlGeometry GetNodesGeometryAggregate(IEnumerable<Noeud> nodes)
+        private SqlGeometry GetNodesGeometryAggregate(IEnumerable<Noeud> nodes, double buffer)
         {
             SqlGeometry geom = SqlTypesExtensions.PointEmpty_SqlGeometry(2154);
             foreach (var pointGeom in nodes)
             {
-                geom = geom.STUnion(pointGeom.Geometry);
+                geom = geom.STUnion(buffer == 0d ? pointGeom.Geometry : pointGeom.Geometry.STBuffer(0));
             }
             return geom;
         }
