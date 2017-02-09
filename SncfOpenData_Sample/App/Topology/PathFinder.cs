@@ -13,7 +13,7 @@ namespace SncfOpenData
 {
     public class PathFinder
     {
-        private Dictionary<int, Noeud> _nodes;
+        private Dictionary<int, Noeud> _nodes; // Network nodes (ie) where lines change
         private Dictionary<int, Troncon> _troncons;
 
 
@@ -26,22 +26,24 @@ namespace SncfOpenData
         /// <summary>
         /// Finds path passing by all checkpoints in specified order
         /// </summary>
-        /// <param name="checkpoints"></param>
+        /// <param name="stopAreas"></param>
         /// <param name="bufferAroundPoints">Distance around point to minimize network analysis</param>
-        internal List<Troncon> FindPath(HashSet<int> checkpoints, int bufferAroundPoints = 5000)
+        internal List<Troncon> FindPath(HashSet<int> stopAreas, int bufferAroundPoints = 5000)
         {
-            Dictionary<int, Noeud> ignNodes = FilterNodesById(_nodes, checkpoints);
+            // get only stop area nodes
+            Dictionary<int, Noeud> stopAreasIgnNodes = FilterNodesById(_nodes, stopAreas);
 
-            SqlGeometry geom = GetNodesGeometryAggregate(ignNodes.Values, 30);
+            // get subnetwork convering only all stop areas 
+            SqlGeometry geom = GetNodesGeometryAggregate(stopAreasIgnNodes.Values, 30);
             geom = geom.STEnvelope().STBuffer(bufferAroundPoints).STEnvelope();
             var tronconsInRoute = FilterTronconsByGeometry(_troncons, geom).ToList();
             var nodesInRoute = FilterNodesByGeometry(_nodes, geom).ToList();
 
             // Generate topology
-            var topology = Topology.Compute(tronconsInRoute, ignNodes.Values.ToList());
+            var topology = Topology.Compute(tronconsInRoute, nodesInRoute);
 
             // Launch path finding
-            var troncons = FindPath_GraphCollection(topology, ignNodes);
+            var troncons = FindPath_GraphCollection(topology, stopAreasIgnNodes);
             return troncons;
         }
 

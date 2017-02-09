@@ -153,7 +153,7 @@ namespace SncfOpenData
             IEnumerable<Route> routes = _sncfRepo.Routes;
             // debug test route
             //routes = routes.Take(1);
-            //routes = routes.Where(r => r.Id == "route:OCE:104647-TrainTER-87581009-87592006");
+            routes = routes.Where(r => r.Id == "route:OCE:104647-TrainTER-87581009-87592006");
 
             foreach (Route route in routes)
             {

@@ -18,11 +18,15 @@ namespace SncfOpenData
         public Dictionary<int, TopoNode> TopoNodes = new Dictionary<int, TopoNode>();
         public Dictionary<int, TopoTroncon> TopoTroncons = new Dictionary<int, TopoTroncon>();
 
+        private Topology(List<Troncon> tronconsInRoute, List<Noeud> nodesInRoute)
+        {
+            Troncons = tronconsInRoute;
+            Nodes = nodesInRoute;
+        }
+
         public static Topology Compute(List<Troncon> tronconsInRoute, List<Noeud> nodesInRoute)
         {
-            var topology = new Topology();
-            topology.Troncons = tronconsInRoute;
-            topology.Nodes = nodesInRoute;
+            var topology = new Topology(tronconsInRoute, nodesInRoute);
             topology.Compute();
 
             return topology;
@@ -31,23 +35,21 @@ namespace SncfOpenData
         private void Compute()
         {
             // We want to have a pointer for each troncon to start and end geometry
-
             int index = 0;
             foreach (Troncon troncon in Troncons)
             {
                 SqlGeometry start = troncon.Geometry.STStartPoint();
                 SqlGeometry end = troncon.Geometry.STEndPoint();
 
-                if (!TopoNodes.Values.Any(n => n.Geometry.STEquals(start).IsTrue))
+                if (!NodeExists(start))
                 {
-                    TopoNode startTNode = new TopoNode { Id = index++, IsStart = true, Geometry = start };
-                    TopoNodes.Add(startTNode.Id, startTNode);
+                    AddNode(start, index++);
                 }
-                if (!TopoNodes.Any(n => n.Value.Geometry.STEquals(end).IsTrue))
+                if (!NodeExists(end))
                 {
-                    TopoNode endTNode = new TopoNode { Id = index++, IsStart = false, Geometry = end };
-                    TopoNodes.Add(endTNode.Id, endTNode);
+                    AddNode(end, index++);
                 }
+               
             }
 
             foreach (var topoNode in TopoNodes)
@@ -86,6 +88,17 @@ namespace SncfOpenData
 
         }
 
+        private void AddNode(SqlGeometry newNode, int nodeIndex)
+        {
+            TopoNode newTopoNode = new TopoNode { Id = nodeIndex, Geometry = newNode };
+            TopoNodes.Add(newTopoNode.Id, newTopoNode);
+        }
+
+        private bool NodeExists(SqlGeometry nodeGeom)
+        {
+            return TopoNodes.Values.Any(n => n.Geometry.STEquals(nodeGeom).IsTrue);
+        }
+
         private void SpatialTrace_Connexions(List<Troncon> connectedTroncons, KeyValuePair<int, TopoNode> topoNode)
         {
             SpatialTrace.Enable();
@@ -96,7 +109,7 @@ namespace SncfOpenData
             }
 
             foreach (var troncon in connectedTroncons)
-            {   
+            {
                 foreach (var tronconOther in connectedTroncons.Where(t => t.Id != troncon.Id))
                 {
                     var angle = Geometry.AngleBetweenLines(troncon.Geometry, tronconOther.Geometry);

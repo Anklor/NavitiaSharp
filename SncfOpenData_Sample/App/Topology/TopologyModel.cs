@@ -11,7 +11,6 @@ namespace SncfOpenData.App.Topology
 	{
 		public int Id { get; set; }
 		public HashSet<int> IdTroncons { get; set; }
-		public bool IsStart { get; set; }
 		public SqlGeometry Geometry { get; set; }
 
 		public TopoNode()
