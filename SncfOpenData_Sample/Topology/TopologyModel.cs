@@ -17,7 +17,14 @@ namespace SncfOpenData.App.Topology
 		{
 			IdTroncons = new HashSet<int>();
 		}
-		public bool Equals(TopoNode other)
+        public TopoNode(int newId, TopoNode original) : this()
+        {
+            Id = newId;
+            Geometry = original.Geometry;
+        }
+
+
+        public bool Equals(TopoNode other)
 		{
 			return this.GetHashCode().Equals(other.GetHashCode());
 		}

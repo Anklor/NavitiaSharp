@@ -76,11 +76,34 @@ namespace SncfOpenData
                 {
                     Debug.Assert(connectedTroncons.Count % 2 == 0, "Bridge or tunnel has a weird number of connections");
 
-                    Dictionary<double, List<Troncon>> tronconsByHeading = GroupTronconsByHeading(connectedTroncons, topoNode.Value.Geometry);
+                    List<List<Troncon>> colinearGroups = FindColinearTroncons(connectedTroncons, topoNode.Value.Geometry);
 
-                    SpatialTrace_Connexions(connectedTroncons, topoNode);
-                    topoNode.Value.IdTroncons.UnionWith(connectedTroncons.Select(t => t.Id));
+                    bool firstGroup = true;
+                    foreach (var group in colinearGroups)
+                    {
+                        // avoid to make topoNode orphan
+                        // add new node on second iteration only
+                        if (!firstGroup)
+                        {
+                            index++;
+                            var newNode = new TopoNode(index, topoNode.Value);
+                            newNodes.Add(index, newNode);
+                            newNode.IdTroncons.UnionWith(group.Select(t => t.Id));
+                        }
+                        else
+                        {
+                            Debug.Assert(topoNode.Value.IdTroncons.Count == 0, "Toponode is already connected.");
+                            topoNode.Value.IdTroncons.UnionWith(group.Select(t => t.Id));
+                            firstGroup = false;
+                        }
+                    }
                 }
+            }
+
+            // 3. Merge nodes
+            foreach(var newNode in newNodes)
+            {
+                TopoNodes.Add(newNode.Key, newNode.Value);
             }
 
             TopoTroncons = new Dictionary<int, TopoTroncon>();
@@ -98,19 +121,28 @@ namespace SncfOpenData
 
         }
 
-        private Dictionary<double, List<Troncon>> GroupTronconsByHeading(List<Troncon> connectedTroncons, SqlGeometry geometry)
+        private List<List<Troncon>> FindColinearTroncons(List<Troncon> connectedTroncons, SqlGeometry intersectionPoint)
         {
-            var northAxis = Geometry.LineSegment(geometry, SqlGeometry.Point(geometry.STX.Value, geometry.STY.Value + 100, geometry.STSrid.Value));
-            Dictionary<Troncon, double> headings = new Dictionary<Troncon, double>();
-            Dictionary<Troncon, double> headingsMod180 = new Dictionary<Troncon, double>();
+            HashSet<int> visitedIds = new HashSet<int>();
+            List<List<Troncon>> groups = new List<List<Troncon>>();
             foreach (var troncon in connectedTroncons)
             {
-                double heading = Geometry.AngleBetweenLines(troncon.Geometry, northAxis) * 180 / Math.PI;
-                headings.Add(troncon, heading);
-                headingsMod180.Add(troncon, (360-heading)%180);
+                if (visitedIds.Contains(troncon.Id))
+                    continue;
+
+                Troncon colinear = connectedTroncons.Where(t => t.Id != troncon.Id)
+                                    .FirstOrDefault(t => !visitedIds.Contains(t.Id) && Geometry.AreColinear(troncon.Geometry, t.Geometry, intersectionPoint));
+                Debug.Assert(colinear != null, "Cannot find colinear troncon");
+
+                visitedIds.Add(troncon.Id);
+                visitedIds.Add(colinear.Id);
+
+                groups.Add(new List<Troncon> { troncon, colinear });
+
             }
-            return null;
+            return groups;
         }
+
 
         private bool IsIgnNode(KeyValuePair<int, TopoNode> topoNode)
         {
