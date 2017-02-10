@@ -13,8 +13,8 @@ namespace SncfOpenData
 {
     public class PathFinder
     {
-        private Dictionary<int, Noeud> _nodes; // Network nodes (ie) where lines change
-        private Dictionary<int, Troncon> _troncons;
+        private Dictionary<int, Noeud> _nodes; // Network nodes
+        private Dictionary<int, Troncon> _troncons; // Edges
 
 
         public PathFinder(Dictionary<int, Troncon> troncons, Dictionary<int, Noeud> nodes)

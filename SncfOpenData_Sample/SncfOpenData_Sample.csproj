@@ -66,11 +66,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="App\CoreService.cs" />
-    <Compile Include="App\Topology\Angle.cs" />
-    <Compile Include="App\Topology\Geometry.cs" />
-    <Compile Include="App\Topology\PathFinder.cs" />
-    <Compile Include="App\Topology\Topology.cs" />
-    <Compile Include="App\Topology\TopologyModel.cs" />
+    <Compile Include="Topology\Angle.cs" />
+    <Compile Include="Topology\Geometry.cs" />
+    <Compile Include="Topology\PathFinder.cs" />
+    <Compile Include="Topology\Topology.cs" />
+    <Compile Include="Topology\TopologyModel.cs" />
     <Compile Include="GraphCollection\Dijkstra.cs" />
     <Compile Include="GraphCollection\GraphNode.cs" />
     <Compile Include="GraphCollection\IQueue.cs" />

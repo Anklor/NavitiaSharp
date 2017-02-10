@@ -10,25 +10,7 @@ namespace SncfOpenData.App.Topology
 {
     public static class Geometry
     {
-        public static SqlGeometry LastSegment(SqlGeometry line, SqlGeometry origin)
-        {
-            SqlGeometry segment = null;
-            if (line.STStartPoint().STEquals(origin))
-            {
-                int numPoints = line.STNumPoints().Value;
-                segment = Geometry.LineSegment(line.STPointN(numPoints - 1), line.STPointN(numPoints));
-            }
-            else if (line.STEndPoint().STEquals(origin))
-            {
-                segment = Geometry.LineSegment(line.STPointN(1), line.STPointN(2));
-            }
-            else
-            {
-                segment = null;
-            }
-
-            return segment;
-        }
+        
         public static SqlGeometry LastSegmentTo(SqlGeometry line, SqlGeometry dest)
         {
             SqlGeometry segment = null;

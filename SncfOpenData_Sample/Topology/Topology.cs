@@ -4,6 +4,7 @@ using SncfOpenData.IGN.Model;
 using SqlServerSpatial.Toolkit;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -18,15 +19,15 @@ namespace SncfOpenData
         public Dictionary<int, TopoNode> TopoNodes = new Dictionary<int, TopoNode>();
         public Dictionary<int, TopoTroncon> TopoTroncons = new Dictionary<int, TopoTroncon>();
 
-        private Topology(List<Troncon> tronconsInRoute, List<Noeud> nodesInRoute)
+        private Topology(List<Troncon> troncons, List<Noeud> nodes)
         {
-            Troncons = tronconsInRoute;
-            Nodes = nodesInRoute;
+            Troncons = troncons;
+            Nodes = nodes;
         }
 
-        public static Topology Compute(List<Troncon> tronconsInRoute, List<Noeud> nodesInRoute)
+        public static Topology Compute(List<Troncon> troncons, List<Noeud> nodes)
         {
-            var topology = new Topology(tronconsInRoute, nodesInRoute);
+            var topology = new Topology(troncons, nodes);
             topology.Compute();
 
             return topology;
@@ -34,41 +35,50 @@ namespace SncfOpenData
 
         private void Compute()
         {
+            // 1. Add all edges start and end points -> distinct topology nodes
+
             // We want to have a pointer for each troncon to start and end geometry
             int index = 0;
             foreach (Troncon troncon in Troncons)
             {
-                SqlGeometry start = troncon.Geometry.STStartPoint();
-                SqlGeometry end = troncon.Geometry.STEndPoint();
+                SqlGeometry start = troncon.StartPoint;
+                SqlGeometry end = troncon.EndPoint;
 
-                if (!NodeExists(start))
+                if (!NodeAdded(start))
                 {
                     AddNode(start, index++);
                 }
-                if (!NodeExists(end))
+                if (!NodeAdded(end))
                 {
                     AddNode(end, index++);
                 }
-               
+
             }
 
+            // 2. get connections between nodes and edges
+
+            Dictionary<int, TopoNode> newNodes = new Dictionary<int, TopoNode>();
             foreach (var topoNode in TopoNodes)
             {
-                var connectedTroncons = Troncons.Where(t => t.Geometry.STStartPoint().STEquals(topoNode.Value.Geometry).IsTrue
-                                                                    || t.Geometry.STEndPoint().STEquals(topoNode.Value.Geometry).IsTrue)
-                                                                    .ToList();
-                if (connectedTroncons.Count > 3)
+                var connectedTroncons = Troncons.Where(t => t.StartPoint.STEquals(topoNode.Value.Geometry).IsTrue
+                                                            || t.EndPoint.STEquals(topoNode.Value.Geometry).IsTrue)
+                                                            .ToList();
+
+                // Is the topology node an "IGN node" ?
+                // Yes => proceed
+                // No => IGN indicates that this is a bridge or tunnel and there are in fact
+                // multiple nodes connecting only two edges at once
+                if (IsIgnNode(topoNode) || connectedTroncons.Count == 1)
                 {
-                    //foreach(var troncon in connectedTroncons)
-                    //{
-                    //    double angleOK = 0;
-                    //    connectedTroncons.Where(t => t.Id != troncon.Id && Geometry.AngleBetweenLines(troncon.Geometry, t.Geometry) < )
-                    //}
-                    SpatialTrace_Connexions(connectedTroncons, topoNode);
                     topoNode.Value.IdTroncons.UnionWith(connectedTroncons.Select(t => t.Id));
                 }
                 else
                 {
+                    Debug.Assert(connectedTroncons.Count % 2 == 0, "Bridge or tunnel has a weird number of connections");
+
+                    Dictionary<double, List<Troncon>> tronconsByHeading = GroupTronconsByHeading(connectedTroncons, topoNode.Value.Geometry);
+
+                    SpatialTrace_Connexions(connectedTroncons, topoNode);
                     topoNode.Value.IdTroncons.UnionWith(connectedTroncons.Select(t => t.Id));
                 }
             }
@@ -88,13 +98,33 @@ namespace SncfOpenData
 
         }
 
+        private Dictionary<double, List<Troncon>> GroupTronconsByHeading(List<Troncon> connectedTroncons, SqlGeometry geometry)
+        {
+            var northAxis = Geometry.LineSegment(geometry, SqlGeometry.Point(geometry.STX.Value, geometry.STY.Value + 100, geometry.STSrid.Value));
+            Dictionary<Troncon, double> headings = new Dictionary<Troncon, double>();
+            Dictionary<Troncon, double> headingsMod180 = new Dictionary<Troncon, double>();
+            foreach (var troncon in connectedTroncons)
+            {
+                double heading = Geometry.AngleBetweenLines(troncon.Geometry, northAxis) * 180 / Math.PI;
+                headings.Add(troncon, heading);
+                headingsMod180.Add(troncon, (360-heading)%180);
+            }
+            return null;
+        }
+
+        private bool IsIgnNode(KeyValuePair<int, TopoNode> topoNode)
+        {
+            bool eq = Nodes.Any(n => n.Geometry.STEquals(topoNode.Value.Geometry).IsTrue);
+            return eq;
+        }
+
         private void AddNode(SqlGeometry newNode, int nodeIndex)
         {
             TopoNode newTopoNode = new TopoNode { Id = nodeIndex, Geometry = newNode };
             TopoNodes.Add(newTopoNode.Id, newTopoNode);
         }
 
-        private bool NodeExists(SqlGeometry nodeGeom)
+        private bool NodeAdded(SqlGeometry nodeGeom)
         {
             return TopoNodes.Values.Any(n => n.Geometry.STEquals(nodeGeom).IsTrue);
         }
