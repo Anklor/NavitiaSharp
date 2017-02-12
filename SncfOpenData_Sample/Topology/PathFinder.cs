@@ -124,10 +124,20 @@ namespace SncfOpenData
 
         private Troncon GetTronconBetweenNodes(Topology topology, int nodeIdFrom, int nodeIdTo)
         {
-            Troncon trn = topology.TopoTroncons.Where(kvp => kvp.Value.IdNodes.Contains(nodeIdFrom) && kvp.Value.IdNodes.Contains(nodeIdTo))
+            Troncon trn = null;
+            var troncons = topology.TopoTroncons.Where(kvp => kvp.Value.IdNodes.Contains(nodeIdFrom) && kvp.Value.IdNodes.Contains(nodeIdTo))
                                  .Select(t => topology.Troncons.First(baseTrn => baseTrn.Id == t.Value.IdTroncon))
-                                 .Single();
-            return trn;
+                                 .ToList();
+
+            if (troncons.Count == 0)
+            {
+                throw new Exception("No troncon found between nodes.");
+            }
+            else if (troncons.Count > 1)
+            {
+                throw new Exception($"1 troncon expected. {troncons.Count} token.");
+            }
+            return troncons.Single();
         }
 
         #endregion

@@ -63,7 +63,6 @@ namespace SncfOpenData
                 var connectedTroncons = Troncons.Where(t => t.StartPoint.STEquals(topoNode.Value.Geometry).IsTrue
                                                             || t.EndPoint.STEquals(topoNode.Value.Geometry).IsTrue)
                                                             .ToList();
-
                 // Is the topology node an "IGN node" ?
                 // Yes => proceed
                 // No => IGN indicates that this is a bridge or tunnel and there are in fact
@@ -101,7 +100,7 @@ namespace SncfOpenData
             }
 
             // 3. Merge nodes
-            foreach(var newNode in newNodes)
+            foreach (var newNode in newNodes)
             {
                 TopoNodes.Add(newNode.Key, newNode.Value);
             }
@@ -132,13 +131,15 @@ namespace SncfOpenData
 
                 Troncon colinear = connectedTroncons.Where(t => t.Id != troncon.Id)
                                     .FirstOrDefault(t => !visitedIds.Contains(t.Id) && Geometry.AreColinear(troncon.Geometry, t.Geometry, intersectionPoint));
-                Debug.Assert(colinear != null, "Cannot find colinear troncon");
+                //Debug.Assert(colinear != null, "Cannot find colinear troncon");
 
-                visitedIds.Add(troncon.Id);
-                visitedIds.Add(colinear.Id);
+                if (colinear != null)
+                {
+                    visitedIds.Add(troncon.Id);
+                    visitedIds.Add(colinear.Id);
 
-                groups.Add(new List<Troncon> { troncon, colinear });
-
+                    groups.Add(new List<Troncon> { troncon, colinear });
+                }
             }
             return groups;
         }

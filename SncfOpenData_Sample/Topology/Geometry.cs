@@ -117,9 +117,11 @@ namespace SncfOpenData.App.Topology
 
         }
 
-        public static bool AreColinear(SqlGeometry linea, SqlGeometry lineb, SqlGeometry intersectionPoint, float threshold = 0.000027f)
+        public static bool AreColinear(SqlGeometry linea, SqlGeometry lineb, SqlGeometry intersectionPoint, float threshold = 0.05f)
         {
-            return ColinearIndice(linea, lineb, intersectionPoint) < (1-threshold);
+            var indice = ColinearIndice(linea, lineb, intersectionPoint);
+            float delta = Math.Abs((1 - threshold) - indice);
+            return delta < threshold;
 
         }
     }
