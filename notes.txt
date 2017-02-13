@@ -61,7 +61,8 @@ declare @bufferStopPoint float = 750
 declare @bufferStartStop float = @bufferStopPoint*2
 
 declare @ids table (seq int identity, id int);
-insert into @ids (id) values (2112),(3705),(2598),(2600),(3691),(3573),(2067),(2068),(1478),(2722),(3399)
+insert into @ids (id) values
+(2815),(2496),(3782),(3162),(3238),(4334),(3460),(1836),(4335),(2235)
 
 declare @resultids table (seq int identity, idTroncon int);
 insert into @resultids (idTroncon) values 

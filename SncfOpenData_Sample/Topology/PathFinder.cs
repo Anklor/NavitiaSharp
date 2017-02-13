@@ -6,10 +6,11 @@ using System.Threading.Tasks;
 using SncfOpenData.IGN.Model;
 using Microsoft.SqlServer.Types;
 using SqlServerSpatial.Toolkit;
-using SncfOpenData.App.Topology;
 using GraphCollection;
+using System.Diagnostics;
+using NavitiaSharp;
 
-namespace SncfOpenData
+namespace SncfOpenData.Topology
 {
     public class PathFinder
     {
@@ -28,7 +29,7 @@ namespace SncfOpenData
         /// </summary>
         /// <param name="stopAreas"></param>
         /// <param name="bufferAroundPoints">Distance around point to minimize network analysis</param>
-        internal List<Troncon> FindPath(HashSet<int> stopAreas, int bufferAroundPoints = 5000)
+        internal List<Troncon> FindPath(HashSet<int> stopAreas, CommercialMode commercialMode, int bufferAroundPoints = 5000)
         {
             // get only stop area nodes
             Dictionary<int, Noeud> stopAreasIgnNodes = FilterNodesById(_nodes, stopAreas);
@@ -36,11 +37,12 @@ namespace SncfOpenData
             // get subnetwork convering only all stop areas 
             SqlGeometry geom = GetNodesGeometryAggregate(stopAreasIgnNodes.Values, 30);
             geom = geom.STEnvelope().STBuffer(bufferAroundPoints).STEnvelope();
-            var tronconsInRoute = FilterTronconsByGeometry(_troncons, geom).ToList();
+            var tronconsInRoute = FilterTronconsByGeometry(_troncons, geom);
+            tronconsInRoute = FilterTronconsByCommercialMode(tronconsInRoute, commercialMode);
             var nodesInRoute = FilterNodesByGeometry(_nodes, geom).ToList();
 
             // Generate topology
-            var topology = Topology.Compute(tronconsInRoute, nodesInRoute);
+            var topology = Topology.Compute(tronconsInRoute.ToList(), nodesInRoute);
 
             // Launch path finding
             var troncons = FindPath_GraphCollection(topology, stopAreasIgnNodes);
@@ -98,6 +100,7 @@ namespace SncfOpenData
         private IList<GraphNode<int>> FindShortestPath(Topology topology, IEnumerable<GraphNode<int>> graph, Dictionary<int, Noeud> stopPoints)
         {
             TopoNode topoNodeStart = topology.TopoNodes.Where(n => n.Value.Geometry.STEquals(stopPoints.First().Value.Geometry).IsTrue).Single().Value;
+            //TopoNode topoNodeEnd = topology.TopoNodes.Where(n => n.Value.Geometry.STEquals(stopPoints.Skip(1).First().Value.Geometry).IsTrue).Single().Value; // test with second node
             TopoNode topoNodeEnd = topology.TopoNodes.Where(n => n.Value.Geometry.STEquals(stopPoints.Last().Value.Geometry).IsTrue).Single().Value;
 
             GraphNode<int> start = graph.Where(n => n.Value == topoNodeStart.Id).Single();
@@ -112,11 +115,14 @@ namespace SncfOpenData
 
         private List<Troncon> TransformPathToEdgeList(Topology topology, IList<GraphNode<int>> path)
         {
+             
+            var listnodeIds = "(" + String.Join<int>("),(", path.Select(g => g.Value)) + ")"; 
             List<Troncon> pathInTroncons = new List<Troncon>();
             for (int i = 0; i < path.Count - 1; i++)
             {
                 var current = path[i];
                 var next = path[i + 1];
+
                 pathInTroncons.Add(GetTronconBetweenNodes(topology, current.Value, next.Value));
             }
             return pathInTroncons;
@@ -124,7 +130,6 @@ namespace SncfOpenData
 
         private Troncon GetTronconBetweenNodes(Topology topology, int nodeIdFrom, int nodeIdTo)
         {
-            Troncon trn = null;
             var troncons = topology.TopoTroncons.Where(kvp => kvp.Value.IdNodes.Contains(nodeIdFrom) && kvp.Value.IdNodes.Contains(nodeIdTo))
                                  .Select(t => topology.Troncons.First(baseTrn => baseTrn.Id == t.Value.IdTroncon))
                                  .ToList();
@@ -135,7 +140,8 @@ namespace SncfOpenData
             }
             else if (troncons.Count > 1)
             {
-                throw new Exception($"1 troncon expected. {troncons.Count} token.");
+                Debug.Assert(troncons.Count == 1, "Ambiguous path. 1st will be chosen.");
+                return troncons.First();
             }
             return troncons.Single();
         }
@@ -202,6 +208,16 @@ namespace SncfOpenData
             return troncons.Where(kvp => kvp.Value.Geometry.STIntersects(geomFilter).Value == true)
                             .Select(t => t.Value);
         }
+
+        private IEnumerable<Troncon> FilterTronconsByCommercialMode(IEnumerable<Troncon> troncons, CommercialMode commercialMode)
+        {
+            if (commercialMode.Name!="TGV")
+            {
+                return troncons.Where(kvp => kvp.Nature != "LGV");
+            }
+            else { return troncons; }
+        }
+
 
         #endregion
     }

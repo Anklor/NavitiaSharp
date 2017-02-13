@@ -46,6 +46,11 @@ namespace SncfOpenData.IGN.Model
         {
             return Id;
         }
+
+        public override string ToString()
+        {
+            return $"{Id} - {Nature}";
+        }
     }
 }
 

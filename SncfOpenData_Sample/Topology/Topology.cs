@@ -1,5 +1,4 @@
 ﻿using Microsoft.SqlServer.Types;
-using SncfOpenData.App.Topology;
 using SncfOpenData.IGN.Model;
 using SqlServerSpatial.Toolkit;
 using System;
@@ -9,7 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SncfOpenData
+namespace SncfOpenData.Topology
 {
     public class Topology
     {
@@ -74,8 +73,9 @@ namespace SncfOpenData
                 else
                 {
                     Debug.Assert(connectedTroncons.Count % 2 == 0, "Bridge or tunnel has a weird number of connections");
+                    Debug.WriteLine(topoNode.Value.Id);
 
-                    List<List<Troncon>> colinearGroups = FindColinearTroncons(connectedTroncons, topoNode.Value.Geometry);
+                    List<ColinearGroup> colinearGroups = FindColinearTroncons(connectedTroncons, topoNode.Value.Geometry);
 
                     bool firstGroup = true;
                     foreach (var group in colinearGroups)
@@ -85,14 +85,15 @@ namespace SncfOpenData
                         if (!firstGroup)
                         {
                             index++;
+                            Debug.WriteLine("new " + index.ToString());
                             var newNode = new TopoNode(index, topoNode.Value);
                             newNodes.Add(index, newNode);
-                            newNode.IdTroncons.UnionWith(group.Select(t => t.Id));
+                            newNode.IdTroncons.UnionWith(group.ColinearTroncons.Select(t => t.Id));
                         }
                         else
                         {
                             Debug.Assert(topoNode.Value.IdTroncons.Count == 0, "Toponode is already connected.");
-                            topoNode.Value.IdTroncons.UnionWith(group.Select(t => t.Id));
+                            topoNode.Value.IdTroncons.UnionWith(group.ColinearTroncons.Select(t => t.Id));
                             firstGroup = false;
                         }
                     }
@@ -120,10 +121,10 @@ namespace SncfOpenData
 
         }
 
-        private List<List<Troncon>> FindColinearTroncons(List<Troncon> connectedTroncons, SqlGeometry intersectionPoint)
+        private List<ColinearGroup> FindColinearTroncons(List<Troncon> connectedTroncons, SqlGeometry intersectionPoint)
         {
             HashSet<int> visitedIds = new HashSet<int>();
-            List<List<Troncon>> groups = new List<List<Troncon>>();
+            List<ColinearGroup> groups = new List<ColinearGroup>();
             foreach (var troncon in connectedTroncons)
             {
                 if (visitedIds.Contains(troncon.Id))
@@ -138,7 +139,7 @@ namespace SncfOpenData
                     visitedIds.Add(troncon.Id);
                     visitedIds.Add(colinear.Id);
 
-                    groups.Add(new List<Troncon> { troncon, colinear });
+                    groups.Add(new ColinearGroup(Geometry.ColinearAngleDegrees(troncon.Geometry, colinear.Geometry, intersectionPoint), new List<Troncon> { troncon, colinear }));
                 }
             }
             return groups;

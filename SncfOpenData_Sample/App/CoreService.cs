@@ -15,6 +15,7 @@ using System.Threading.Tasks;
 using System.Windows.Media;
 using System.Text;
 using System.IO;
+using SncfOpenData.Topology;
 
 namespace SncfOpenData
 {
@@ -155,12 +156,13 @@ namespace SncfOpenData
             IEnumerable<Route> routes = _sncfRepo.Routes;
             // debug test route
             //routes = routes.Take(1);
-            //routes = routes.Where(r => r.Id == "route:OCE:104647-TrainTER-87581009-87592006");
+            routes = routes.Where(r => r.Id == "route:OCE:120-TrainTER-87391003-87394007");
             Trace.Listeners.Add(new ConsoleTraceListener());
             using (StreamWriter sw = new StreamWriter("matchroutes.txt", false))
             {
                 foreach (Route route in routes)
                 {
+                    Line line = _sncfRepo.Lines.First(l => l.Id == route.Line.Id);
                     Trace.TraceInformation($"MatchRoutesWithTronconsIGN: route {route.Name}...");
 
                     // How to get proper order for stop areas ?
@@ -193,12 +195,14 @@ namespace SncfOpenData
                             var nodesIds = "(" + String.Join<int>("),(", ignNodes) + ")"; // insert clause
 
                             sw.WriteLine("---------------------------------");
+                            sw.WriteLine("-- Route " + route.Id);
                             sw.WriteLine("--" + route.Name + " " + route.Direction.Name);
                             sw.WriteLine(nodesIds);
 
                             try
                             {
-                                List<Troncon> path = pathfinder.FindPath(ignNodes, 5000);
+
+                                List<Troncon> path = pathfinder.FindPath(ignNodes, line.CommercialMode, 5000);
                                 var tronconsIds = "(" + String.Join<int>("),(", path.Select(p => p.Id)) + ")"; // check path clause
 
 
@@ -217,7 +221,7 @@ namespace SncfOpenData
                                 sw.WriteLine("Error: " + ex.ToString());
                                 Trace.TraceError("Error: " + ex.Message);
                             }
-                          
+
 
                             sw.Flush();
                             Trace.TraceInformation($"MatchRoutesWithTronconsIGN: Done.");

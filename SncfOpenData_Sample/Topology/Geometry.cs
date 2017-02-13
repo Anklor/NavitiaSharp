@@ -7,7 +7,7 @@ using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SncfOpenData.App.Topology
+namespace SncfOpenData.Topology
 {
     public static class Geometry
     {
@@ -114,6 +114,22 @@ namespace SncfOpenData.App.Topology
             Vector2 bCosVec = new Vector2(bv.X / bMag, bv.Y / bMag);
             float cosAngle = Vector2.Dot(aCosVec, bCosVec);
             return Math.Abs(cosAngle);
+
+        }
+
+        public static double ColinearAngleDegrees(SqlGeometry linea, SqlGeometry lineb, SqlGeometry intersectionPoint)
+        {
+            var a = Geometry.FirstSegmentFrom(linea, intersectionPoint);
+            var b = Geometry.FirstSegmentFrom(lineb, intersectionPoint);
+            Vector2 av = a.ToVector();
+            Vector2 bv = b.ToVector();
+            float aMag = av.Length();
+            float bMag = bv.Length();
+
+            Vector2 aCosVec = new Vector2(av.X / aMag, av.Y / aMag);
+            Vector2 bCosVec = new Vector2(bv.X / bMag, bv.Y / bMag);
+            float cosAngle = Vector2.Dot(aCosVec, bCosVec);
+            return Math.Acos(cosAngle) * 180 / Math.PI;
 
         }
 

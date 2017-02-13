@@ -4,14 +4,21 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.SqlServer.Types;
+using System.Diagnostics;
 
-namespace SncfOpenData.App.Topology
+namespace SncfOpenData.Topology
 {
 	public class TopoNode : IEquatable<TopoNode>
 	{
 		public int Id { get; set; }
 		public HashSet<int> IdTroncons { get; set; }
 		public SqlGeometry Geometry { get; set; }
+
+        /// <summary>
+        /// When node is a "virtual" node built to handle line crossings, this field
+        /// contains the original node Id (useful to reconstruct path)
+        /// </summary>
+        //public int OriginalNodeId { get; private set; }
 
 		public TopoNode()
 		{
@@ -20,6 +27,8 @@ namespace SncfOpenData.App.Topology
         public TopoNode(int newId, TopoNode original) : this()
         {
             Id = newId;
+            //Debug.Assert(original.OriginalNodeId == 0, "Original node is a virtual node.");
+            //OriginalNodeId = original.Id;
             Geometry = original.Geometry;
         }
 

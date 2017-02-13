@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SncfOpenData.App.Topology
+namespace SncfOpenData.Topology
 {
     public static class Angle
     {
