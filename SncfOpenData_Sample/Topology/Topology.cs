@@ -72,8 +72,10 @@ namespace SncfOpenData.Topology
                 }
                 else
                 {
-                    Debug.Assert(connectedTroncons.Count % 2 == 0, "Bridge or tunnel has a weird number of connections");
-                    Debug.WriteLine(topoNode.Value.Id);
+                    if (connectedTroncons.Count % 2 != 0)
+                    {
+                        Trace.TraceWarning($"Bridge or tunnel has a weird number of connections. Edges: {string.Join<int>(", ", connectedTroncons.Select(t=>t.Id))}");
+                    }
 
                     List<ColinearGroup> colinearGroups = FindColinearTroncons(connectedTroncons, topoNode.Value.Geometry);
 
@@ -85,7 +87,7 @@ namespace SncfOpenData.Topology
                         if (!firstGroup)
                         {
                             index++;
-                            Debug.WriteLine("new " + index.ToString());
+                            //Debug.WriteLine("new " + index.ToString());
                             var newNode = new TopoNode(index, topoNode.Value);
                             newNodes.Add(index, newNode);
                             newNode.IdTroncons.UnionWith(group.ColinearTroncons.Select(t => t.Id));

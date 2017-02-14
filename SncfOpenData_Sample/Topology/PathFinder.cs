@@ -62,11 +62,18 @@ namespace SncfOpenData.Topology
         private List<Troncon> FindPath_GraphCollection(Topology topology, Dictionary<int, Noeud> stopPoints)
         {
             IEnumerable<GraphNode<int>> graph = GenerateGraph(topology, stopPoints);
+            if (!graph.Any())
+            {
+                Trace.TraceWarning("Graph is empty.");
+                return new List<Troncon>();
+            }
+            else
+            {
+                IList<GraphNode<int>> path = FindShortestPath(topology, graph, stopPoints);
 
-            IList<GraphNode<int>> path = FindShortestPath(topology, graph, stopPoints);
-
-            List<Troncon> troncons = TransformPathToEdgeList(topology, path);
-            return troncons;
+                List<Troncon> troncons = TransformPathToEdgeList(topology, path);
+                return troncons;
+            }
         }
 
         #region FindPath_GraphCollection
@@ -115,15 +122,19 @@ namespace SncfOpenData.Topology
 
         private List<Troncon> TransformPathToEdgeList(Topology topology, IList<GraphNode<int>> path)
         {
-             
-            var listnodeIds = "(" + String.Join<int>("),(", path.Select(g => g.Value)) + ")"; 
+
+            var listnodeIds = "(" + String.Join<int>("),(", path.Select(g => g.Value)) + ")";
             List<Troncon> pathInTroncons = new List<Troncon>();
             for (int i = 0; i < path.Count - 1; i++)
             {
                 var current = path[i];
                 var next = path[i + 1];
 
-                pathInTroncons.Add(GetTronconBetweenNodes(topology, current.Value, next.Value));
+                var troncon = GetTronconBetweenNodes(topology, current.Value, next.Value);
+                if (troncon != null)
+                {
+                    pathInTroncons.Add(GetTronconBetweenNodes(topology, current.Value, next.Value));
+                }
             }
             return pathInTroncons;
         }
@@ -136,11 +147,13 @@ namespace SncfOpenData.Topology
 
             if (troncons.Count == 0)
             {
-                throw new Exception("No troncon found between nodes.");
+                Trace.TraceWarning($"No troncon found between nodes.");
+                return null;
             }
             else if (troncons.Count > 1)
             {
-                Debug.Assert(troncons.Count == 1, "Ambiguous path. 1st will be chosen.");
+                Trace.TraceWarning($"Ambiguous path between {string.Join<int>(", ", troncons.Select(t => t.Id))} edges. 1st will be chosen.");
+                //Debug.Assert(troncons.Count == 1, "Ambiguous path. 1st will be chosen.");
                 return troncons.First();
             }
             return troncons.Single();
@@ -211,7 +224,7 @@ namespace SncfOpenData.Topology
 
         private IEnumerable<Troncon> FilterTronconsByCommercialMode(IEnumerable<Troncon> troncons, CommercialMode commercialMode)
         {
-            if (commercialMode.Name!="TGV")
+            if (commercialMode.Name != "TGV")
             {
                 return troncons.Where(kvp => kvp.Nature != "LGV");
             }

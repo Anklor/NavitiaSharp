@@ -67,6 +67,7 @@ insert into @ids (id) values
 declare @resultids table (seq int identity, idTroncon int);
 insert into @resultids (idTroncon) values 
 (3307),(3306),(5203),(5204),(1772),(3052),(3053),(3054),(3051),(3048),(3049),(3050),(3047),(1804),(1805),(1801),(1799),(1796),(1795),(1802),(1803),(1798),(1797),(1800),(1653),(1650),(1656),(1657),(1654),(1655),(1651),(1652),(336),(335),(334),(2221)
+
 declare @startId int
 declare @endId int 
 select top 1 @startId =  id from @ids order by seq

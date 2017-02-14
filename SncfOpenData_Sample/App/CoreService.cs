@@ -156,7 +156,7 @@ namespace SncfOpenData
             IEnumerable<Route> routes = _sncfRepo.Routes;
             // debug test route
             //routes = routes.Take(1);
-            routes = routes.Where(r => r.Id == "route:OCE:120-TrainTER-87391003-87394007");
+            //routes = routes.Where(r => r.Id == "route:OCE:120-TrainTER-87391003-87394007");
             Trace.Listeners.Add(new ConsoleTraceListener());
             using (StreamWriter sw = new StreamWriter("matchroutes.txt", false))
             {
@@ -168,8 +168,8 @@ namespace SncfOpenData
                     // How to get proper order for stop areas ?
                     // Let's look at route schedules
                     List<RouteSchedule> schedules = _sncfRepo.GetRouteSchedules(route, false);
-                    Debug.Assert(schedules.Count == 1, $"Zero or more than one schedule for route {route.Name}");
-                    var schedule = schedules.First();
+                    //Debug.Assert(schedules.Count == 1, $"Zero or more than one schedule for route {route.Name}");
+                    var schedule = schedules.FirstOrDefault();
                     if (schedule == null)
                     {
                         Trace.TraceWarning($"No schedule found.");
