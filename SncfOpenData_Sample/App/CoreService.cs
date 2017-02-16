@@ -16,6 +16,7 @@ using System.Windows.Media;
 using System.Text;
 using System.IO;
 using SncfOpenData.Topology;
+using System.Collections.Concurrent;
 
 namespace SncfOpenData
 {
@@ -156,90 +157,110 @@ namespace SncfOpenData
             IEnumerable<Route> routes = _sncfRepo.Routes;
             // debug test route
             //routes = routes.Take(1);
-            //routes = routes.Where(r => r.Id == "route:OCE:120-TrainTER-87391003-87394007");
+            //routes = routes.Where(r => r.Id == "route:OCE:343-TrainTER-87751008-87763607");
+            routes = routes.Where(r => r.Id == "route:OCE:10-TrainTER-87473009-87473181");
+            //routes = routes.Where(r => r.Line.Id == "line:OCE:343");
             Trace.Listeners.Add(new ConsoleTraceListener());
+
+
+            ParallelQuery<RoutePathResult> results = routes.AsParallel().Select(route => CalculateRoutePath(route, pathfinder));
             using (StreamWriter sw = new StreamWriter("matchroutes.txt", false))
             {
-                foreach (Route route in routes)
+                foreach (var result in results)
                 {
-                    Line line = _sncfRepo.Lines.First(l => l.Id == route.Line.Id);
-                    Trace.TraceInformation($"MatchRoutesWithTronconsIGN: route {route.Name}...");
+                    Route route = result.Route;
+                    sw.WriteLine("---------------------------------");
+                    sw.WriteLine("-- Route " + route.Id);
+                    sw.WriteLine("--" + route.Name + " TO " + route.Direction.Name);
+                    sw.WriteLine(IdsAsSQLInClause(result.StopAreasNode.Values.Select(n => n.Id)));
 
-                    // How to get proper order for stop areas ?
-                    // Let's look at route schedules
-                    List<RouteSchedule> schedules = _sncfRepo.GetRouteSchedules(route, false);
-                    //Debug.Assert(schedules.Count == 1, $"Zero or more than one schedule for route {route.Name}");
-                    var schedule = schedules.FirstOrDefault();
-                    if (schedule == null)
+                    try
                     {
-                        Trace.TraceWarning($"No schedule found.");
-                    }
-                    else if (!schedule.Table.WithSchedule)
-                    {
-                        Trace.TraceWarning($"No time tables for schedule.");
-                    }
-                    else
-                    {
-                        List<StopArea> stopareas = null;
-                        _sncfRepo.RoutesStopAreas.TryGetValue(route.Id, out stopareas);
-                        if (stopareas == null || stopareas.Count == 0)
+
+                        sw.WriteLine("--");
+                        if (result.ResultTroncons.Any())
                         {
-                            Trace.TraceWarning($"No stop areas found.");
+                            var tronconsIds = "(" + String.Join<int>("),(", result.ResultTroncons.Select(p => p.Id)) + ")"; // check path clause
+
+                            sw.WriteLine(tronconsIds);
                         }
                         else
                         {
-
-                            stopareas = FilterAndSortStopAreas(stopareas, schedule);
-
-                            HashSet<int> ignNodes = GetStopAreaIgnNodes(stopareas);
-                            var nodesIds = "(" + String.Join<int>("),(", ignNodes) + ")"; // insert clause
-
-                            sw.WriteLine("---------------------------------");
-                            sw.WriteLine("-- Route " + route.Id);
-                            sw.WriteLine("--" + route.Name + " " + route.Direction.Name);
-                            sw.WriteLine(nodesIds);
-
-                            try
-                            {
-
-                                List<Troncon> path = pathfinder.FindPath(ignNodes, line.CommercialMode, 5000);
-                                var tronconsIds = "(" + String.Join<int>("),(", path.Select(p => p.Id)) + ")"; // check path clause
-
-
-                                sw.WriteLine("--");
-                                if (path.Any())
-                                {
-                                    sw.WriteLine(tronconsIds);
-                                }
-                                else
-                                {
-                                    sw.WriteLine("No route found !");
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                sw.WriteLine("Error: " + ex.ToString());
-                                Trace.TraceError("Error: " + ex.Message);
-                            }
-
-
-                            sw.Flush();
-                            Trace.TraceInformation($"MatchRoutesWithTronconsIGN: Done.");
-
-
-                            // TODO : Dijkstra for all troncons within envelope of all line stop areas
-                            //FindPath(topologyByTroncon, topologyByNode, tronconsInRoute.ToDictionary(t => t.Id, t => t), ignNodes.First(), ignNodes.Last());
+                            sw.WriteLine("No route found !");
                         }
+                    }
+                    catch (Exception ex)
+                    {
+                        sw.WriteLine("Error: " + ex.ToString());
+                        Trace.TraceError("Error: " + ex.Message);
                     }
 
 
+                    sw.Flush();
+                    Trace.TraceInformation($"MatchRoutesWithTronconsIGN: Done.");
+
+
+                    // TODO : Dijkstra for all troncons within envelope of all line stop areas
+                    //FindPath(topologyByTroncon, topologyByNode, tronconsInRoute.ToDictionary(t => t.Id, t => t), ignNodes.First(), ignNodes.Last());
                 }
             }
         }
 
-        private HashSet<int> GetStopAreaIgnNodes(List<StopArea> stopareas)
+        public RoutePathResult CalculateRoutePath(Route route, PathFinder pathfinder)
         {
-            return new HashSet<int>(stopareas.Select(sa => _sncfRepo.IgnNodeByStopArea[sa.Id]));
+            Line line = _sncfRepo.Lines.First(l => l.Id == route.Line.Id);
+            RoutePathResult result = new RoutePathResult(route, line);
+
+            Trace.TraceInformation($"MatchRoutesWithTronconsIGN: route {route.Name}...");
+
+            // How to get proper order for stop areas ?
+            // Let's look at route schedules
+            List<RouteSchedule> schedules = _sncfRepo.GetRouteSchedules(route, false);
+            //Debug.Assert(schedules.Count == 1, $"Zero or more than one schedule for route {route.Name}");
+            result.Schedule = schedules.FirstOrDefault();
+            if (result.Schedule == null)
+            {
+                Trace.TraceWarning($"No schedule found.");
+            }
+            else if (!result.Schedule.Table.WithSchedule)
+            {
+                Trace.TraceWarning($"No time tables for schedule.");
+            }
+            else
+            {
+                List<StopArea> stopareas = null;
+                _sncfRepo.RoutesStopAreas.TryGetValue(route.Id, out stopareas);
+                if (stopareas == null || stopareas.Count == 0)
+                {
+                    Trace.TraceWarning($"No stop areas found.");
+                }
+                else
+                {
+
+                    stopareas = FilterAndSortStopAreas(stopareas, result.Schedule);
+                    result.StopAreas = stopareas;
+
+                    Dictionary<StopArea, int> ignNodes = GetStopAreaIgnNodes(stopareas);
+                    result.StopAreasNode = ignNodes.ToDictionary(kvp => kvp.Key, kvp => pathfinder.Nodes[kvp.Value]);
+                    var nodesIds = "(" + String.Join<int>("),(", ignNodes.Values) + ")"; // insert clause
+                    try
+                    {
+                        result.ResultTroncons = pathfinder.FindPath(ignNodes.Values, line.CommercialMode, 5000);
+                    }
+                    catch (Exception ex)
+                    {
+                        result.Exception = ex;
+                        Trace.TraceError("Error: " + ex.Message);
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        private Dictionary<StopArea, int> GetStopAreaIgnNodes(List<StopArea> stopareas)
+        {
+            return stopareas.ToDictionary(sa => sa, sa => _sncfRepo.IgnNodeByStopArea[sa.Id]);
         }
 
         public void ShowStopAreasOnMap(SncfRepository _sncfRepo, IGNRepository _ignRepo, string wkt = null)
@@ -327,6 +348,10 @@ namespace SncfOpenData
             return FromCoordToGeometry(coord).ReprojectTo(2154);
         }
 
+        private string IdsAsSQLInClause(IEnumerable<int> ids)
+        {
+            return "(" + string.Join("),(", ids) + ")"; // insert clause
+        }
 
         #endregion
 

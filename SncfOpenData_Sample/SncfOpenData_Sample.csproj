@@ -70,6 +70,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="App\CoreService.cs" />
+    <Compile Include="App\RoutePathResult.cs" />
     <Compile Include="Topology\Angle.cs" />
     <Compile Include="Topology\ColinearGroup.cs" />
     <Compile Include="Topology\Geometry.cs" />

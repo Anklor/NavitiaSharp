@@ -14,14 +14,14 @@ namespace SncfOpenData.Topology
 {
     public class PathFinder
     {
-        private Dictionary<int, Noeud> _nodes; // Network nodes
-        private Dictionary<int, Troncon> _troncons; // Edges
+        public Dictionary<int, Noeud> Nodes { get; private set; } // Network nodes
+        public Dictionary<int, Troncon> Troncons { get; private set; } // Edges
 
 
         public PathFinder(Dictionary<int, Troncon> troncons, Dictionary<int, Noeud> nodes)
         {
-            this._troncons = troncons;
-            this._nodes = nodes;
+            this.Troncons = troncons;
+            this.Nodes = nodes;
         }
 
         /// <summary>
@@ -29,17 +29,17 @@ namespace SncfOpenData.Topology
         /// </summary>
         /// <param name="stopAreas"></param>
         /// <param name="bufferAroundPoints">Distance around point to minimize network analysis</param>
-        internal List<Troncon> FindPath(HashSet<int> stopAreas, CommercialMode commercialMode, int bufferAroundPoints = 5000)
+        internal List<Troncon> FindPath(IEnumerable<int> stopAreas, CommercialMode commercialMode, int bufferAroundPoints = 5000)
         {
             // get only stop area nodes
-            Dictionary<int, Noeud> stopAreasIgnNodes = FilterNodesById(_nodes, stopAreas);
+            Dictionary<int, Noeud> stopAreasIgnNodes = FilterNodesById(Nodes, new HashSet<int>(stopAreas));
 
             // get subnetwork convering only all stop areas 
             SqlGeometry geom = GetNodesGeometryAggregate(stopAreasIgnNodes.Values, 30);
             geom = geom.STEnvelope().STBuffer(bufferAroundPoints).STEnvelope();
-            var tronconsInRoute = FilterTronconsByGeometry(_troncons, geom);
+            var tronconsInRoute = FilterTronconsByGeometry(Troncons, geom);
             tronconsInRoute = FilterTronconsByCommercialMode(tronconsInRoute, commercialMode);
-            var nodesInRoute = FilterNodesByGeometry(_nodes, geom).ToList();
+            var nodesInRoute = FilterNodesByGeometry(Nodes, geom).ToList();
 
             // Generate topology
             var topology = Topology.Compute(tronconsInRoute.ToList(), nodesInRoute);
@@ -93,6 +93,10 @@ namespace SncfOpenData.Topology
             {
                 // find nodes directly reachable from node
                 Dictionary<TopoTroncon, TopoNode> accessibleNodes = GetAccessibleNodes(topology, node.Value);
+                if (!accessibleNodes.Any())
+                {
+                    Trace.TraceWarning("No nodes accessibles.");
+                }
                 foreach (var closeNode in accessibleNodes)
                 {
                     GraphNode<int> gNodeStart = graphNodes[node.Value.Id];
@@ -161,7 +165,6 @@ namespace SncfOpenData.Topology
 
         #endregion
 
-        // TODO : check in troncon has compatible headings
         private Dictionary<TopoTroncon, TopoNode> GetAccessibleNodes(Topology topology, TopoNode topoNode)
         {
             Dictionary<TopoTroncon, TopoNode> nodesByTroncon = new Dictionary<TopoTroncon, TopoNode>();
