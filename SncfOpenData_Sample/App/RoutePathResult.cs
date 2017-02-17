@@ -21,12 +21,9 @@ namespace SncfOpenData
         public StringBuilder Log { get; set; }
         public Exception Exception { get; set; }
 
-        public string Temp_TronconsId
+        public bool HasResult
         {
-            get
-            {
-                return "(" + String.Join<int>("),(", ResultTroncons.Select(p => p.Id)) + ")"; // check path clause
-            }
+            get { return Exception == null && ResultTroncons != null && ResultTroncons.Any(); }
         }
 
 
@@ -39,10 +36,9 @@ namespace SncfOpenData
             Log = new StringBuilder();
         }
 
-        public RoutePathResult(Route route, Line line) : base()
+        public RoutePathResult(Route route) : this()
         {
             Route = route;
-            Line = line;
         }
     }
 }
